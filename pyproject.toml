@@ -1,0 +1,25 @@
+[project]
+name = "tabra"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "SongTan", email = "sepinetam@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.4.3",
+    "pandas>=3.0.1",
+    "scipy>=1.17.1",
+]
+
+[project.scripts]
+tabra = "tabra:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
