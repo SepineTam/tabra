@@ -23,6 +23,8 @@ from tabra.models.estimate.heckman import HeckmanModel
 from tabra.models.estimate.tobit import TobitModel
 from tabra.models.estimate.qreg import QuantileRegression
 from tabra.models.estimate.ordered_choice import OrderedProbitModel, OrderedLogitModel
+from tabra.models.estimate.glm import GLMModel
+from tabra.models.estimate.mlogit import MultinomialLogitModel
 
 
 class TabraData:
@@ -184,6 +186,27 @@ class TabraData:
             result.set_display(True)
         return result
 
+    def glm(self, y: str, x: list[str], family: str = "gaussian",
+            link: str = None, is_con: bool = True):
+        model = GLMModel()
+        result = model.fit(self._df, y, x, family=family, link=link, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def mlogit(self, y: str, x: list[str], base_outcome=None,
+               is_con: bool = True):
+        model = MultinomialLogitModel()
+        result = model.fit(self._df, y, x, base_outcome=base_outcome,
+                           is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
     def summarize(self, var_list: list[str] = None, detail: bool = False):
         from tabra.results.summarize_result import SummarizeResult
         from scipy.stats import skew as scipy_skew, kurtosis as scipy_kurtosis
@@ -242,3 +265,13 @@ class TabraData:
     def rename(self, old: str, new: str):
         warnings.warn("建议使用 tab.data.rename() 代替 tab.rename()", DeprecationWarning, stacklevel=2)
         return self.data.rename(old, new)
+
+    def __add__(self, other):
+        """Support tab + df / tab + tab2, returns a new TabraData."""
+        new_tab = TabraData(
+            self._df.copy(),
+            style=self._style,
+            is_display_result=self._is_display_result,
+        )
+        new_tab.data.append(other)
+        return new_tab
