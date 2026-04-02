@@ -10,6 +10,7 @@
 import pandas as pd
 
 from tabra.models.estimate.ols import OLS
+from tabra.models.estimate.panel import PanelModel
 
 
 class TabraData:
@@ -29,6 +30,7 @@ class TabraData:
 
         self._result = None
         self._model = None
+        self._panel_var = None
 
     @property
     def result(self):
@@ -48,6 +50,20 @@ class TabraData:
     def reg(self, y: str, x: list[str], is_con: bool = True):
         model = OLS()
         result = model.fit(self._df, y, x, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def xeset(self, panel_var: str):
+        self._panel_var = panel_var
+
+    def xereg(self, y: str, x: list[str], model: str = "fe", is_con: bool = True):
+        if self._panel_var is None:
+            raise ValueError("请先调用 xeset() 设置面板变量")
+        panel_model = PanelModel()
+        result = panel_model.fit(self._df, y, x, self._panel_var, model=model, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:

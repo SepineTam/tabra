@@ -15,7 +15,8 @@ class OLSResult(BaseResult):
     def __init__(self, coef, std_err, t_stat, p_value,
                  r_squared, r_squared_adj, f_stat, f_pval,
                  resid, fitted, n_obs, k_vars, var_names,
-                 SSR, SSE, SST, df_model, df_resid, mse, root_mse):
+                 SSR, SSE, SST, df_model, df_resid, mse, root_mse,
+                 y_name=""):
         super().__init__()
         self._coef = coef
         self._std_err = std_err
@@ -37,6 +38,7 @@ class OLSResult(BaseResult):
         self._df_resid = df_resid
         self._mse = mse
         self._root_mse = root_mse
+        self._y_name = y_name
 
     @property
     def coef(self):
@@ -110,15 +112,46 @@ class OLSResult(BaseResult):
         ms_resid = self._mse
         ms_total = self._SST / (self._n_obs - 1)
 
-        lines.append(f"{'':>10s} Source | {'SS':>12s} {'df':>5s} {'MS':>12s}        Number of obs = {self._n_obs:>8d}")
-        lines.append(f"{'':>10s}-------+{'-' * 40}    F({self._df_model}, {self._df_resid})  = {self._f_stat:>8.2f}")
-        lines.append(f"{'':>10s}  Model | {self._SSE:>12.4f} {self._df_model:>5d} {ms_model:>12.6f}        Prob > F       = {self._f_pval:>7.4f}")
-        lines.append(f"{'':>10s}Residual| {self._SSR:>12.4f} {self._df_resid:>5d} {ms_resid:>12.6f}        R-squared      = {self._r_squared:>7.4f}")
-        lines.append(f"{'':>10s}-------+{'-' * 40}    Adj R-squared  = {self._r_squared_adj:>7.4f}")
-        lines.append(f"{'':>10s}  Total | {self._SST:>12.4f} {self._n_obs - 1:>5d} {ms_total:>12.6f}        Root MSE       = {self._root_mse:>7.4f}")
+        # Dynamic column widths based on actual data
+        ss_w = max(
+            len(f"{self._SSE:.4f}"), len(f"{self._SSR:.4f}"),
+            len(f"{self._SST:.4f}"), len("SS"),
+        )
+        ms_w = max(
+            len(f"{ms_model:.6f}"), len(f"{ms_resid:.6f}"),
+            len(f"{ms_total:.6f}"), len("MS"),
+        )
+        # Left block: source(12) + " | "(3) + SS(ss_w) + " "(1) + df(5) + " "(1) + MS(ms_w)
+        LW = 22 + ss_w + ms_w + 4  # +4 for gap between left and right blocks
+
+        def left(source, ss_str, df_val, ms_str):
+            return f"{source:>12s} | {ss_str} {df_val:>5d} {ms_str}"
+
+        RLW = 14
+        def right(label, value, fmt="8.4f"):
+            return f"{label:<{RLW}s}= {value:>{fmt}}"
+
+        sep = f"-------------+{'-' * (LW - 14)}"
+
+        hdr = f"{'Source':>12s} | {'SS':>{ss_w}s} {'df':>5s} {'MS':>{ms_w}s}"
+        lines.append(f"{hdr:<{LW}s}{right('Number of obs', self._n_obs, '8d')}")
+
+        f_label = f"F({self._df_model}, {self._df_resid})"
+        lines.append(f"{sep:<{LW}s}{right(f_label, self._f_stat, '8.2f')}")
+
+        mdl = left("Model", f"{self._SSE:>{ss_w}.4f}", self._df_model, f"{ms_model:>{ms_w}.6f}")
+        lines.append(f"{mdl:<{LW}s}{right('Prob > F', self._f_pval)}")
+
+        res = left("Residual", f"{self._SSR:>{ss_w}.4f}", self._df_resid, f"{ms_resid:>{ms_w}.6f}")
+        lines.append(f"{res:<{LW}s}{right('R-squared', self._r_squared)}")
+
+        lines.append(f"{sep:<{LW}s}{right('Adj R-squared', self._r_squared_adj)}")
+
+        tot = left("Total", f"{self._SST:>{ss_w}.4f}", self._n_obs - 1, f"{ms_total:>{ms_w}.6f}")
+        lines.append(f"{tot:<{LW}s}{right('Root MSE', self._root_mse)}")
         lines.append("")
         lines.append(f"{'-' * 76}")
-        lines.append(f"{'':>12s} | {'Coef.':>10s} {'Std. Err.':>10s} {'t':>8s} {'P>|t|':>6s} {'[95% Conf. Interval]':>22s}")
+        lines.append(f"{self._y_name:>12s} | {'Coef.':>10s} {'Std. Err.':>10s} {'t':>8s} {'P>|t|':>6s} {'[95% Conf. Interval]':>22s}")
         lines.append(f"{'-' * 76}")
 
         t_crit = stats.t.ppf(0.975, self._df_resid)

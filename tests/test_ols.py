@@ -164,7 +164,7 @@ def test_var_names_with_constant(ols_data):
     model = OLS()
     result = model.fit(df, y="y", x=["x1", "x2"], is_con=True)
 
-    assert result.var_names == ["_cons", "x1", "x2"]
+    assert result.var_names == ["x1", "x2", "_cons"]
 
 
 def test_var_names_no_constant(ols_data):

@@ -8,5 +8,6 @@
 # @File   : __init__.py
 
 from tabra.models.estimate.ols import OLS
+from tabra.models.estimate.panel import PanelModel
 
-__all__ = ["OLS"]
+__all__ = ["OLS", "PanelModel"]

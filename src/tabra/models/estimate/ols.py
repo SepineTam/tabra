@@ -21,7 +21,7 @@ class OLS(BaseModel):
         var_names = list(x)
         if is_con:
             X = np.column_stack([np.ones(X.shape[0]), X])
-            var_names = ["_cons"] + var_names
+            var_names = var_names + ["_cons"]
         n, k = X.shape
 
         XtX = mat_mul(mat_transpose(X), X)
@@ -57,6 +57,7 @@ class OLS(BaseModel):
             resid=resid.flatten(), fitted=fitted.flatten(), n_obs=n, k_vars=k,
             var_names=var_names, SSR=SSR, SSE=SSE, SST=SST,
             df_model=df_model, df_resid=df_resid, mse=SSR / (n - k), root_mse=np.sqrt(SSR / (n - k)),
+            y_name=y,
         )
 
     def estimate(self, df, x, **kwargs):

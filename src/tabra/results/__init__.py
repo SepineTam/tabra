@@ -8,5 +8,6 @@
 # @File   : __init__.py
 
 from tabra.results.ols_result import OLSResult
+from tabra.results.panel_result import PanelResult
 
-__all__ = ["OLSResult"]
+__all__ = ["OLSResult", "PanelResult"]
