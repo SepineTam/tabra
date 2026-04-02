@@ -10,6 +10,7 @@
 import re
 
 import numpy as np
+import pandas as pd
 
 
 class DataOps:
@@ -273,4 +274,38 @@ class DataOps:
             df[target] = col
 
         self._tabra._df = df
+        return self
+
+    def _append(self, other: pd.DataFrame):
+        """Concatenate another DataFrame vertically (Stata append)."""
+        self._tabra._df = pd.concat(
+            [self._tabra._df, other], ignore_index=True,
+        )
+
+    def append(self, other):
+        """
+        Append rows from another DataFrame or TabraData.
+
+        Parameters
+        ----------
+        other : pd.DataFrame or TabraData
+            Data to append (stacked vertically).
+
+        Returns
+        -------
+        self : DataOps
+            Returns self for method chaining.
+        """
+        from tabra.core.data import TabraData
+
+        if isinstance(other, TabraData):
+            other_df = other._df
+        elif isinstance(other, pd.DataFrame):
+            other_df = other
+        else:
+            raise TypeError(
+                f"Expected pd.DataFrame or TabraData, got {type(other).__name__}"
+            )
+
+        self._append(other_df)
         return self

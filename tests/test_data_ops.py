@@ -326,3 +326,113 @@ class TestDataOpsWinsor2:
         tab.data.winsor2("x").drop("x").rename("x_w", "x")
         assert "x" in tab._df.columns
         assert "x_w" not in tab._df.columns
+
+
+class TestDataOpsAppend:
+    @pytest.fixture
+    def base_df(self):
+        return pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+
+    def test_append_dataframe(self, base_df):
+        tab = load_data(base_df, is_display_result=False)
+        df2 = pd.DataFrame({"x": [7, 8], "y": [9, 10]})
+        tab.data.append(df2)
+        assert len(tab._df) == 5
+
+    def test_append_tabradata(self, base_df):
+        tab1 = load_data(base_df, is_display_result=False)
+        tab2 = load_data(
+            pd.DataFrame({"x": [7], "y": [8]}), is_display_result=False,
+        )
+        tab1.data.append(tab2)
+        assert len(tab1._df) == 4
+
+    def test_append_returns_data_ops(self, base_df):
+        tab = load_data(base_df, is_display_result=False)
+        result = tab.data.append(pd.DataFrame({"x": [0], "y": [0]}))
+        assert result is not None
+
+    def test_append_invalid_type_raises(self, base_df):
+        tab = load_data(base_df, is_display_result=False)
+        with pytest.raises(TypeError):
+            tab.data.append("not a dataframe")
+
+    def test_append_different_columns(self, base_df):
+        tab = load_data(base_df, is_display_result=False)
+        df2 = pd.DataFrame({"x": [7], "z": [99]})
+        tab.data.append(df2)
+        assert len(tab._df) == 4
+        assert "z" in tab._df.columns
+
+    def test_add_operator_dataframes(self, base_df):
+        tab1 = load_data(base_df, is_display_result=False)
+        tab2 = load_data(
+            pd.DataFrame({"x": [7, 8], "y": [9, 10]}), is_display_result=False,
+        )
+        combined = tab1 + tab2
+        assert len(combined._df) == 5
+        # original unchanged
+        assert len(tab1._df) == 3
+
+    def test_add_operator_tabradata(self, base_df):
+        tab1 = load_data(base_df, is_display_result=False)
+        tab2 = load_data(
+            pd.DataFrame({"x": [7], "y": [8]}), is_display_result=False,
+        )
+        combined = tab1 + tab2
+        assert len(combined._df) == 4
+
+    def test_add_operator_preserves_style(self, base_df):
+        tab1 = load_data(base_df, style="stata", is_display_result=False)
+        tab2 = load_data(
+            pd.DataFrame({"x": [7], "y": [8]}), is_display_result=False,
+        )
+        combined = tab1 + tab2
+        assert combined._style == "stata"
+
+    def test_add_operator_with_df(self, base_df):
+        tab1 = load_data(base_df, is_display_result=False)
+        df2 = pd.DataFrame({"x": [7], "y": [8]})
+        combined = tab1 + df2
+        assert len(combined._df) == 4
+
+    def test_append_missing_columns_both_sides(self):
+        """df1 有 z 没 w，df2 有 w 没 z → 合并后两列都有 NaN"""
+        df1 = pd.DataFrame({"x": [1], "z": [10]})
+        df2 = pd.DataFrame({"x": [2], "w": [20]})
+        tab = load_data(df1, is_display_result=False)
+        tab.data.append(df2)
+        assert len(tab._df) == 2
+        assert "z" in tab._df.columns
+        assert "w" in tab._df.columns
+        assert tab._df.loc[0, "z"] == 10
+        assert pd.isna(tab._df.loc[1, "z"])
+        assert pd.isna(tab._df.loc[0, "w"])
+        assert tab._df.loc[1, "w"] == 20
+
+    def test_append_dtype_int_float(self):
+        """df1 int, df2 float → 合并后自动提升为 float"""
+        df1 = pd.DataFrame({"x": [1, 2]})
+        df2 = pd.DataFrame({"x": [3.5, 4.5]})
+        tab = load_data(df1, is_display_result=False)
+        tab.data.append(df2)
+        assert len(tab._df) == 4
+        assert tab._df["x"].dtype == np.float64
+
+    def test_append_dtype_string_in_one(self):
+        """df1 numeric, df2 有 string 列 → 合并后 object 类型"""
+        df1 = pd.DataFrame({"x": [1, 2]})
+        df2 = pd.DataFrame({"x": ["a", "b"]})
+        tab = load_data(df1, is_display_result=False)
+        tab.data.append(df2)
+        assert len(tab._df) == 4
+        assert tab._df["x"].dtype == object
+
+    def test_append_same_dtypes_preserved(self):
+        """同类型合并后类型不变"""
+        df1 = pd.DataFrame({"x": [1, 2], "y": ["a", "b"]})
+        df2 = pd.DataFrame({"x": [3, 4], "y": ["c", "d"]})
+        tab = load_data(df1, is_display_result=False)
+        tab.data.append(df2)
+        assert tab._df["x"].dtype == np.int64
+        assert pd.api.types.is_string_dtype(tab._df["y"])
