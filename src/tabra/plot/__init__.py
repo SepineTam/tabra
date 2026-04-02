@@ -10,6 +10,29 @@
 import matplotlib.pyplot as plt
 
 
+class TabraFigure:
+    """Wrapper around matplotlib Figure with user-friendly API."""
+
+    def __init__(self, fig):
+        self._fig = fig
+
+    def save(self, filename: str, dpi: int = 300, **kwargs):
+        self._fig.savefig(filename, dpi=dpi, bbox_inches="tight", **kwargs)
+        return self
+
+    def show(self):
+        plt.show()
+        return self
+
+    def close(self):
+        plt.close(self._fig)
+        return self
+
+    @property
+    def figure(self):
+        return self._fig
+
+
 class PlotOps:
     def __init__(self, tabra):
         self._tabra = tabra
@@ -27,4 +50,4 @@ class PlotOps:
         ax.set_ylabel(ytitle if ytitle is not None else y)
         if title is not None:
             ax.set_title(title)
-        return fig
+        return TabraFigure(fig)
