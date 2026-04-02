@@ -236,6 +236,34 @@ class PlotOps:
         self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)
 
+    def pie(self, var: str, title: str = None,
+             template=None, fig_setting=None):
+        """Draw a pie chart of value counts for a variable.
+
+        Args:
+            var (str): Variable name to plot.
+            title (str): Plot title.
+            template (PlotTemplate): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+        """
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig, ax = self._make_fig(template)
+        colors = list(template.color_cycle)
+
+        counts = self._df[var].value_counts()
+        ax.pie(counts.values, labels=counts.index.astype(str),
+               colors=colors[:len(counts)], autopct="%1.1f%%",
+               startangle=90, textprops={"fontsize": template.tick_size})
+        ax.set_aspect("equal")
+        if title is not None:
+            ax.set_title(title)
+        return TabraFigure(fig, tabra=self._tabra)
+
     def violin(self, var: str, by: str = None, title: str = None,
                xtitle: str = None, ytitle: str = None,
                template=None, fig_setting=None):
