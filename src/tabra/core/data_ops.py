@@ -8,6 +8,7 @@
 # @File   : data_ops.py
 
 import re
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -44,22 +45,19 @@ class DataOps:
         return eval(expr, {"__builtins__": {}}, ns)
 
     def gen(self, var: str, expr: str, replace: bool = False):
-        """
-        Generate a new variable based on an expression.
+        """Generate a new variable based on an expression.
 
-        Parameters
-        ----------
-        var : str
-            Name of the variable to create
-        expr : str
-            Expression to evaluate (supports ^, log, exp, sqrt, etc.)
-        replace : bool, optional
-            If True, overwrite existing variable. Default False.
+        Args:
+            var (str): Name of the variable to create.
+            expr (str): Expression to evaluate (supports ^, log, exp, sqrt, etc.).
+            replace (bool): If True, overwrite existing variable. Default False.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> dta.data.gen("mpg_sq", "mpg^2")
         """
         if var in self._tabra._df.columns:
             if not replace:
@@ -115,21 +113,125 @@ class DataOps:
         """Parse vars input into a list of variable names."""
         if isinstance(vars_input, str):
             return vars_input.split()
-        return vars_input
+        return list(vars_input)
+
+    _EGEN_AGG = {
+        "mean": "mean",
+        "sum": "sum",
+        "total": "sum",
+        "max": "max",
+        "min": "min",
+        "sd": lambda x: x.std(ddof=1),
+        "count": "count",
+        "median": "median",
+    }
+
+    def egen(
+        self,
+        new_var: str,
+        func: Literal[
+            "mean", "sum", "total", "max", "min", "sd",
+            "count", "median", "rank", "group", "seq",
+        ],
+        source: str | list[str],
+        *,
+        by: str | list[str] | None = None,
+    ):
+        """Extended generate: compute aggregated / transformed variables.
+
+        Args:
+            new_var (str): Name of the new variable. Must not already exist.
+            func (str): Egen function name.
+            source (str or list): Source variable(s).
+            by (str or list, optional): Group variable(s).
+
+        Returns:
+            DataOps: Returns self for method chaining.
+        """
+        df = self._tabra._df
+
+        if new_var in df.columns:
+            raise ValueError(f"Variable '{new_var}' already exists in DataFrame")
+
+        func = func.lower()
+        by_vars = self._parse_vars(by) if by is not None else None
+
+        # --- group: encode combination into integer IDs ---
+        if func == "group":
+            source_vars = self._parse_vars(source)
+            for v in source_vars:
+                if v not in df.columns:
+                    raise KeyError(f"Variable '{v}' not found in DataFrame")
+            result = df.groupby(source_vars).ngroup() + 1
+            self._tabra._df[new_var] = result
+            return self
+
+        # --- source validation for remaining functions ---
+        if isinstance(source, str):
+            if source not in df.columns:
+                raise KeyError(f"Variable '{source}' not found in DataFrame")
+            src_col = df[source]
+        else:
+            raise TypeError(
+                f"source must be a string for func '{func}', "
+                f"got {type(source).__name__}"
+            )
+
+        if by_vars is not None:
+            for v in by_vars:
+                if v not in df.columns:
+                    raise KeyError(f"Variable '{v}' not found in DataFrame")
+
+        # --- rank ---
+        if func == "rank":
+            if by_vars is not None:
+                result = df.groupby(by_vars)[source].rank(
+                    method="average", ascending=True,
+                )
+            else:
+                result = src_col.rank(method="average", ascending=True)
+            self._tabra._df[new_var] = result
+            return self
+
+        # --- seq ---
+        if func == "seq":
+            if by_vars is not None:
+                result = df.groupby(by_vars).cumcount() + 1
+            else:
+                result = pd.Series(range(1, len(df) + 1), index=df.index)
+            self._tabra._df[new_var] = result
+            return self
+
+        # --- statistical aggregations ---
+        agg = self._EGEN_AGG.get(func)
+        if agg is None:
+            raise ValueError(
+                f"Unknown egen function '{func}'. "
+                f"Supported: {', '.join(sorted(self._EGEN_AGG.keys()))}, "
+                f"rank, group, seq"
+            )
+
+        if by_vars is not None:
+            grouped = df.groupby(by_vars)[source]
+            result = grouped.transform(agg)
+        else:
+            val = agg(src_col) if callable(agg) else src_col.agg(agg)
+            result = pd.Series(val, index=df.index)
+            # broadcast scalar to full length
+            if result.shape[0] == 1 and len(df) > 1:
+                result = pd.Series(val, index=df.index)
+
+        self._tabra._df[new_var] = result
+        return self
 
     def drop(self, vars):
-        """
-        Drop specified columns from the DataFrame.
+        """Drop specified columns from the DataFrame.
 
-        Parameters
-        ----------
-        vars : str or list
-            Variable name(s) to drop.
+        Args:
+            vars (str or list): Variable name(s) to drop.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         vars_list = self._parse_vars(vars)
         for var in vars_list:
@@ -140,18 +242,13 @@ class DataOps:
         return self
 
     def keep(self, vars):
-        """
-        Keep only specified columns, dropping all others.
+        """Keep only specified columns, dropping all others.
 
-        Parameters
-        ----------
-        vars : str or list
-            Variable name(s) to keep.
+        Args:
+            vars (str or list): Variable name(s) to keep.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         vars_list = self._parse_vars(vars)
         for var in vars_list:
@@ -163,20 +260,14 @@ class DataOps:
         return self
 
     def rename(self, old: str, new: str):
-        """
-        Rename an existing variable.
+        """Rename an existing variable.
 
-        Parameters
-        ----------
-        old : str
-            Existing variable name
-        new : str
-            New variable name
+        Args:
+            old (str): Existing variable name.
+            new (str): New variable name.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         if old not in self._tabra._df.columns:
             raise KeyError(f"Variable '{old}' not found in DataFrame")
@@ -197,32 +288,21 @@ class DataOps:
         suffix: str = "_w",
         prefix: str = None,
     ):
-        """
-        Winsorize or trim variables at specified percentiles.
+        """Winsorize or trim variables at specified percentiles.
 
         Mimics Stata's winsor2 command.
 
-        Parameters
-        ----------
-        vars : str or list
-            Variable name(s) to winsorize.
-        cuts : tuple of (float, float), optional
-            Lower and upper percentiles. Default (1, 99).
-        replace : bool, optional
-            If True, overwrite existing variables. Default False.
-        trim : bool, optional
-            If True, trim (set to NaN) instead of winsorize (clamp). Default False.
-        by : str, optional
-            Group variable for group-wise winsorization.
-        suffix : str, optional
-            Suffix for new variable names (used when replace=False). Default "_w".
-        prefix : str, optional
-            Prefix for new variable names. Overrides suffix if provided.
+        Args:
+            vars (str or list): Variable name(s) to winsorize.
+            cuts (tuple): Lower and upper percentiles. Default (1, 99).
+            replace (bool): If True, overwrite existing variables. Default False.
+            trim (bool): If True, trim (set to NaN) instead of winsorize. Default False.
+            by (str): Group variable for group-wise winsorization.
+            suffix (str): Suffix for new variable names. Default "_w".
+            prefix (str): Prefix for new variable names. Overrides suffix.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining.
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         vars_list = self._parse_vars(vars)
         df = self._tabra._df.copy()
@@ -283,18 +363,13 @@ class DataOps:
         )
 
     def append(self, other):
-        """
-        Append rows from another DataFrame or TabraData.
+        """Append rows from another DataFrame or TabraData.
 
-        Parameters
-        ----------
-        other : pd.DataFrame or TabraData
-            Data to append (stacked vertically).
+        Args:
+            other (pd.DataFrame or TabraData): Data to append (stacked vertically).
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining.
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         from tabra.core.data import TabraData
 
@@ -311,18 +386,13 @@ class DataOps:
         return self
 
     def sort(self, vars):
-        """
-        Sort DataFrame by variable(s) in ascending order.
+        """Sort DataFrame by variable(s) in ascending order.
 
-        Parameters
-        ----------
-        vars : str or list
-            Variable name(s) to sort by.
+        Args:
+            vars (str or list): Variable name(s) to sort by.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining.
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         vars_list = self._parse_vars(vars)
         for var in vars_list:
@@ -335,21 +405,16 @@ class DataOps:
         return self
 
     def gsort(self, spec):
-        """
-        Sort with flexible ascending/descending per variable.
+        """Sort with flexible ascending/descending per variable.
 
         Mimics Stata's gsort: prefix ``+`` (or no prefix) for ascending,
         ``-`` for descending.
 
-        Parameters
-        ----------
-        spec : str
-            Sort spec, e.g. ``"-wage +age"`` or ``"wage -age"``.
+        Args:
+            spec (str): Sort spec, e.g. ``"-wage +age"`` or ``"wage -age"``.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining.
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         parts = spec.split()
         cols, ascending = [], []
@@ -374,23 +439,16 @@ class DataOps:
         return self
 
     def recode(self, var, mapping, *, gen: str = None):
-        """
-        Recode values of a variable using a mapping.
+        """Recode values of a variable using a mapping.
 
-        Parameters
-        ----------
-        var : str
-            Variable name to recode.
-        mapping : dict
-            Mapping of {old_value: new_value}.
-            Keys can be single values or tuples for ranges: {(1, 5): "low"}.
-        gen : str, optional
-            Name for the new variable. If None, overwrite in place.
+        Args:
+            var (str): Variable name to recode.
+            mapping (dict): Mapping of {old_value: new_value}. Keys can be single
+                values or tuples for ranges: {(1, 5): "low"}.
+            gen (str): Name for the new variable. If None, overwrite in place.
 
-        Returns
-        -------
-        self : DataOps
-            Returns self for method chaining.
+        Returns:
+            DataOps: Returns self for method chaining.
         """
         if var not in self._tabra._df.columns:
             raise KeyError(f"Variable '{var}' not found in DataFrame")
