@@ -7,6 +7,7 @@
 # @Email  : sepinetam@gmail.com
 # @File   : data.py
 
+import numpy as np
 import pandas as pd
 
 from tabra.models.estimate.ols import OLS
@@ -64,6 +65,45 @@ class TabraData:
             raise ValueError("请先调用 xeset() 设置面板变量")
         panel_model = PanelModel()
         result = panel_model.fit(self._df, y, x, self._panel_var, model=model, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def summarize(self, var_list: list[str] = None, detail: bool = False):
+        from tabra.results.summarize_result import SummarizeResult
+        from scipy.stats import skew as scipy_skew, kurtosis as scipy_kurtosis
+
+        if var_list is None:
+            var_list = self._df.select_dtypes(include="number").columns.tolist()
+
+        obs, mean, std, min_val, max_val = {}, {}, {}, {}, {}
+        percentiles, skewness, kurtosis = {}, {}, {}
+
+        for col in var_list:
+            series = self._df[col].dropna()
+            obs[col] = len(series)
+            mean[col] = float(series.mean())
+            std[col] = float(series.std(ddof=1))
+            min_val[col] = float(series.min())
+            max_val[col] = float(series.max())
+
+            if detail:
+                percentiles[col] = {}
+                for p in [1, 5, 10, 25, 50, 75, 90, 95, 99]:
+                    percentiles[col][f"{p}%"] = float(np.percentile(series, p))
+                skewness[col] = float(scipy_skew(series, bias=False))
+                kurtosis[col] = float(scipy_kurtosis(series, bias=False))
+
+        result = SummarizeResult(
+            var_names=var_list, obs=obs, mean=mean, std=std,
+            min_val=min_val, max_val=max_val,
+            percentiles=percentiles if detail else None,
+            skewness=skewness if detail else None,
+            kurtosis=kurtosis if detail else None,
+            detail=detail,
+        )
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:
