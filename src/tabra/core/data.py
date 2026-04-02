@@ -12,6 +12,7 @@ import pandas as pd
 
 from tabra.models.estimate.ols import OLS
 from tabra.models.estimate.panel import PanelModel
+from tabra.models.estimate.reghdfe import RegHDFE
 
 
 class TabraData:
@@ -51,6 +52,18 @@ class TabraData:
     def reg(self, y: str, x: list[str], is_con: bool = True):
         model = OLS()
         result = model.fit(self._df, y, x, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def reghdfe(self, y: str, x: list[str], absorb: list[str],
+                vce: str = "unadjusted", cluster: list[str] = None,
+                is_con: bool = True):
+        model = RegHDFE()
+        result = model.fit(self._df, y, x, absorb=absorb,
+                           vce=vce, cluster=cluster, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:
