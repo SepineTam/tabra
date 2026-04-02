@@ -14,6 +14,9 @@ from tabra.models.estimate.ols import OLS
 from tabra.models.estimate.panel import PanelModel
 from tabra.models.estimate.reghdfe import RegHDFE
 from tabra.models.estimate.binary_choice import ProbitModel, LogitModel
+from tabra.models.estimate.heckman import HeckmanModel
+from tabra.models.estimate.tobit import TobitModel
+from tabra.models.estimate.qreg import QuantileRegression
 
 
 class TabraData:
@@ -97,6 +100,39 @@ class TabraData:
     def logit(self, y: str, x: list[str], is_con: bool = True):
         model = LogitModel()
         result = model.fit(self._df, y, x, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def heckman(self, y: str, x: list[str], select_x: list[str],
+                select_var: str = None, is_con: bool = True,
+                method: str = "mle"):
+        model = HeckmanModel()
+        result = model.fit(self._df, y, x, select_x=select_x,
+                           select_var=select_var, is_con=is_con,
+                           method=method)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def tobit(self, y: str, x: list[str], ll=None, ul=None,
+              is_con: bool = True):
+        model = TobitModel()
+        result = model.fit(self._df, y, x, ll=ll, ul=ul, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def qreg(self, y: str, x: list[str], quantile: float = 0.5,
+             is_con: bool = True):
+        model = QuantileRegression()
+        result = model.fit(self._df, y, x, quantile=quantile, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:

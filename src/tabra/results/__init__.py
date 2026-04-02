@@ -10,5 +10,6 @@
 from tabra.results.ols_result import OLSResult
 from tabra.results.panel_result import PanelResult
 from tabra.results.summarize_result import SummarizeResult
+from tabra.results.heckman_result import HeckmanResult
 
-__all__ = ["OLSResult", "PanelResult", "SummarizeResult"]
+__all__ = ["OLSResult", "PanelResult", "SummarizeResult", "HeckmanResult"]
