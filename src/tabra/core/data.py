@@ -7,9 +7,13 @@
 # @Email  : sepinetam@gmail.com
 # @File   : data.py
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
+from tabra.core.data_ops import DataOps
+from tabra.plot import PlotOps
 from tabra.models.estimate.ols import OLS
 from tabra.models.estimate.panel import PanelModel
 from tabra.models.estimate.reghdfe import RegHDFE
@@ -37,6 +41,7 @@ class TabraData:
         self._result = None
         self._model = None
         self._panel_var = None
+        self._time_var = None
 
     @property
     def result(self):
@@ -45,6 +50,14 @@ class TabraData:
     @property
     def model(self):
         return self._model
+
+    @property
+    def data(self) -> DataOps:
+        return DataOps(self)
+
+    @property
+    def plot(self) -> PlotOps:
+        return PlotOps(self)
 
     def set_style(self, style: str):
         self._style = style
@@ -74,8 +87,15 @@ class TabraData:
             result.set_display(True)
         return result
 
-    def xeset(self, panel_var: str):
+    def xeset(self, panel_var: str = None, time_var: str = None, clear: bool = False):
+        if clear:
+            self._panel_var = None
+            self._time_var = None
+            return
+        if panel_var is None:
+            raise ValueError("请提供 panel_var，或使用 xeset(clear=True) 清除面板设置")
         self._panel_var = panel_var
+        self._time_var = time_var
 
     def xereg(self, y: str, x: list[str], model: str = "fe", is_con: bool = True):
         if self._panel_var is None:
@@ -177,3 +197,23 @@ class TabraData:
         if self._is_display_result:
             result.set_display(True)
         return result
+
+    def gen(self, var: str, expr: str):
+        warnings.warn("建议使用 tab.data.gen() 代替 tab.gen()", DeprecationWarning, stacklevel=2)
+        return self.data.gen(var, expr)
+
+    def replace(self, var: str, expr: str, cond: str = None):
+        warnings.warn("建议使用 tab.data.replace() 代替 tab.replace()", DeprecationWarning, stacklevel=2)
+        return self.data.replace(var, expr, cond=cond)
+
+    def drop(self, vars):
+        warnings.warn("建议使用 tab.data.drop() 代替 tab.drop()", DeprecationWarning, stacklevel=2)
+        return self.data.drop(vars)
+
+    def keep(self, vars):
+        warnings.warn("建议使用 tab.data.keep() 代替 tab.keep()", DeprecationWarning, stacklevel=2)
+        return self.data.keep(vars)
+
+    def rename(self, old: str, new: str):
+        warnings.warn("建议使用 tab.data.rename() 代替 tab.rename()", DeprecationWarning, stacklevel=2)
+        return self.data.rename(old, new)
