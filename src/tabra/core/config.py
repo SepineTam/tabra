@@ -19,14 +19,20 @@ class Config:
         self._auto_create_missing_dir = True
 
     def set_plot_template(self, template: PlotTemplate):
-        """
-        Set the plot template.
+        """Set the plot template.
 
-        Parameters
-        ----------
-        template : PlotTemplate
-            A PlotTemplate instance. Use presets from tabra.plot.fig_setting:
-            e.g. from tabra.plot.fig_setting import AER, QJE
+        Args:
+            template (PlotTemplate): A PlotTemplate instance. Use presets from
+                tabra.plot.fig_setting, e.g. ``from tabra.plot.fig_setting import AER, QJE``.
+
+        Returns:
+            Config: Returns self for method chaining.
+
+        Example:
+            >>> from tabra.plot.fig_setting import AER
+ QJE
+            >>> dta = load_data("auto")
+            >>> dta.config.set_plot_template(AER)
         """
         if not isinstance(template, PlotTemplate):
             raise TypeError("template must be a PlotTemplate instance")

@@ -18,6 +18,24 @@ class PanelModel(BaseModel):
         super().__init__()
 
     def fit(self, df, y, x, panel_var, model="fe", is_con=True):
+        """Fit a panel data model.
+
+        Args:
+            df (pd.DataFrame): Panel dataset in long format.
+            y (str): Dependent variable name.
+            x (list[str]): Independent variable names.
+            panel_var (str): Column name for the entity identifier.
+            model (str): Estimation method. One of "fe", "re", "be", "mle", "pa". Default "fe".
+            is_con (bool): Whether to include a constant term. Default True.
+
+        Returns:
+            PanelResult: Panel estimation result.
+
+        Example:
+            >>> dta = load_data("nlswork")
+            >>> dta.xeset("idcode", "year")
+            >>> result = PanelModel().fit(dta._df, "ln_wage", ["age", "tenure"], "idcode", model="fe")
+        """
         df = self._prepare_df(df, y, x, extra_cols=[panel_var])
         dispatch = {
             "fe": self._fit_fe,

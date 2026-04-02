@@ -16,6 +16,22 @@ from tabra.results.qreg_result import QRegResult
 
 class QuantileRegression(BaseModel):
     def fit(self, df, y, x, quantile=0.5, is_con=True):
+        """Fit a quantile regression model.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Dependent variable name.
+            x (list[str]): Independent variable names.
+            quantile (float): Target quantile (0, 1). Default 0.5 (median).
+            is_con (bool): Whether to include a constant term. Default True.
+
+        Returns:
+            QRegResult: Quantile regression result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = QuantileRegression().fit(dta._df, "price", ["weight", "mpg"], quantile=0.25)
+        """
         df = self._prepare_df(df, y, x)
         tau = quantile
         y_vec = df[y].values.astype(float)

@@ -27,6 +27,26 @@ class GLMModel(BaseModel):
 
     def fit(self, df, y, x, family="gaussian", link=None,
             is_con=True, max_iter=100, tol=1e-8):
+        """Fit a GLM via Iteratively Reweighted Least Squares (IRLS).
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Dependent variable name.
+            x (list[str]): Independent variable names.
+            family (str): Distribution family. One of "gaussian", "binomial",
+                "poisson", "gamma". Default "gaussian".
+            link (str): Link function. Default None (use canonical link for family).
+            is_con (bool): Whether to include a constant term. Default True.
+            max_iter (int): Maximum IRLS iterations. Default 100.
+            tol (float): Convergence tolerance. Default 1e-8.
+
+        Returns:
+            GLMResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = GLMModel().fit(dta._df, "price", ["weight", "mpg"], family="gaussian")
+        """
         if link is None:
             link = _DEFAULT_LINK.get(family, "identity")
 

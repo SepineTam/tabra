@@ -16,6 +16,21 @@ from tabra.results.ols_result import OLSResult
 
 class OLS(BaseModel):
     def fit(self, df, y, x, is_con=True):
+        """Fit an OLS regression model.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Dependent variable name.
+            x (list[str]): Independent variable names.
+            is_con (bool): Whether to include a constant term. Default True.
+
+        Returns:
+            OLSResult: Estimation result with coefficients, std errors, etc.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = OLS().fit(dta._df, "price", ["weight", "mpg"])
+        """
         df = self._prepare_df(df, y, x)
         y_vec = df[y].values.reshape(-1, 1).astype(float)
         X = df[x].values.astype(float)

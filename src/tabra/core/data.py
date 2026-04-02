@@ -35,8 +35,13 @@ class TabraData:
         style: str = "stata",
         is_display_result: bool = True,
     ):
-        """
-        is_display_result 是在使用完reg之类的东西之后是不是直接就打印出来结果。
+        """Initialize a TabraData instance.
+
+        Args:
+            df (pd.DataFrame): Underlying dataset.
+            style (str): Output display style. Default "stata".
+            is_display_result (bool): Whether to print estimation results
+                immediately after calling reg, probit, etc. Default True.
         """
         self._df = df
         self._style = style
@@ -97,18 +102,29 @@ class TabraData:
         return result
 
     def xeset(self, panel_var: str = None, time_var: str = None, clear: bool = False):
+        """Set or clear panel variables for panel data estimation.
+
+        Args:
+            panel_var (str): Column name for the entity (panel) identifier.
+            time_var (str): Column name for the time identifier.
+            clear (bool): If True, clear the current panel settings. Default False.
+
+        Example:
+            >>> dta = load_data("nlswork")
+            >>> dta.xeset("idcode", "year")
+        """
         if clear:
             self._panel_var = None
             self._time_var = None
             return
         if panel_var is None:
-            raise ValueError("请提供 panel_var，或使用 xeset(clear=True) 清除面板设置")
+            raise ValueError("panel_var is required, or use xeset(clear=True) to clear")
         self._panel_var = panel_var
         self._time_var = time_var
 
     def xereg(self, y: str, x: list[str], model: str = "fe", is_con: bool = True):
         if self._panel_var is None:
-            raise ValueError("请先调用 xeset() 设置面板变量")
+            raise ValueError("Call xeset() first to set panel variables")
         panel_model = PanelModel()
         result = panel_model.fit(self._df, y, x, self._panel_var, model=model, is_con=is_con)
         result.set_style(self._style)
@@ -247,23 +263,23 @@ class TabraData:
         return result
 
     def gen(self, var: str, expr: str):
-        warnings.warn("建议使用 tab.data.gen() 代替 tab.gen()", DeprecationWarning, stacklevel=2)
+        warnings.warn("Use tab.data.gen() instead of tab.gen()", DeprecationWarning, stacklevel=2)
         return self.data.gen(var, expr)
 
     def replace(self, var: str, expr: str, cond: str = None):
-        warnings.warn("建议使用 tab.data.replace() 代替 tab.replace()", DeprecationWarning, stacklevel=2)
+        warnings.warn("Use tab.data.replace() instead of tab.replace()", DeprecationWarning, stacklevel=2)
         return self.data.replace(var, expr, cond=cond)
 
     def drop(self, vars):
-        warnings.warn("建议使用 tab.data.drop() 代替 tab.drop()", DeprecationWarning, stacklevel=2)
+        warnings.warn("Use tab.data.drop() instead of tab.drop()", DeprecationWarning, stacklevel=2)
         return self.data.drop(vars)
 
     def keep(self, vars):
-        warnings.warn("建议使用 tab.data.keep() 代替 tab.keep()", DeprecationWarning, stacklevel=2)
+        warnings.warn("Use tab.data.keep() instead of tab.keep()", DeprecationWarning, stacklevel=2)
         return self.data.keep(vars)
 
     def rename(self, old: str, new: str):
-        warnings.warn("建议使用 tab.data.rename() 代替 tab.rename()", DeprecationWarning, stacklevel=2)
+        warnings.warn("Use tab.data.rename() instead of tab.rename()", DeprecationWarning, stacklevel=2)
         return self.data.rename(old, new)
 
     def __add__(self, other):

@@ -20,6 +20,24 @@ class MultinomialLogitModel(BaseModel):
 
     def fit(self, df, y, x, base_outcome=None, is_con=True, max_iter=200,
             tol=1e-8):
+        """Fit a multinomial logistic regression via MLE.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Categorical dependent variable name.
+            x (list[str]): Independent variable names.
+            base_outcome: Base category value. Default None (uses first category).
+            is_con (bool): Whether to include a constant term. Default True.
+            max_iter (int): Maximum optimizer iterations. Default 200.
+            tol (float): Convergence tolerance. Default 1e-8.
+
+        Returns:
+            MLogitResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = MultinomialLogitModel().fit(dta._df, "rep78", ["price", "weight"])
+        """
         df = self._prepare_df(df, y, x)
         y_vec = df[y].values.astype(int)
         X = df[x].values.astype(float)

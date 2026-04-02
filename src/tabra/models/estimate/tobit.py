@@ -20,6 +20,25 @@ class TobitModel(BaseModel):
 
     def fit(self, df, y, x, ll=None, ul=None, is_con=True,
             max_iter=200, tol=1e-8):
+        """Fit a Tobit censored regression model via MLE.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Dependent variable name.
+            x (list[str]): Independent variable names.
+            ll (float): Left-censoring limit. Default None (no censoring).
+            ul (float): Right-censoring limit. Default None (no censoring).
+            is_con (bool): Whether to include a constant term. Default True.
+            max_iter (int): Maximum optimizer iterations. Default 200.
+            tol (float): Convergence tolerance. Default 1e-8.
+
+        Returns:
+            TobitResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = TobitModel().fit(dta._df, "price", ["weight", "mpg"], ll=0)
+        """
         df = self._prepare_df(df, y, x)
         y_vec = df[y].values.astype(float)
         X = df[x].values.astype(float)
@@ -31,7 +50,7 @@ class TobitModel(BaseModel):
 
         n, k = X.shape
 
-        # 确定删失类型
+        # Determine censoring type
         if ll is not None:
             left_censored = y_vec <= ll
         else:
@@ -46,11 +65,11 @@ class TobitModel(BaseModel):
         n_rc = int(np.sum(right_censored))
         n_unc = int(np.sum(uncensored))
 
-        # Step 1: 拟合仅常数项模型用于 ll_0
+        # Step 1: Fit constant-only model for ll_0
         ll_0 = self._fit_null_model(y_vec, n, ll, ul, is_con)
 
-        # Step 2: 优化完整模型
-        # 初始值: OLS
+        # Step 2: Optimize full model
+        # Initial values: OLS
         beta_init = np.linalg.lstsq(X, y_vec, rcond=None)[0]
         resid = y_vec - X @ beta_init
         sigma_init = np.std(resid, ddof=k)
@@ -72,25 +91,25 @@ class TobitModel(BaseModel):
 
         ll_val = -result_opt.fun
 
-        # Step 3: 标准误 via 数值 Hessian
+        # Step 3: Standard errors via numerical Hessian
         V = self._compute_vce(params, y_vec, X, n, ll, ul, k)
         std_err = np.sqrt(np.abs(np.diag(V)))
         se_beta = std_err[:k]
         se_lnsigma = std_err[k]
 
-        # sigma 的标准误通过 delta method: se(sigma) = sigma * se(ln_sigma)
+        # sigma SE via delta method: se(sigma) = sigma * se(ln_sigma)
         se_sigma = sigma * se_lnsigma
 
-        # t 统计量
+        # t statistics
         t_stat = beta / se_beta
         p_value = 2 * (1 - sp_stats.t.cdf(np.abs(t_stat), df=n - k))
 
-        # LR 检验
+        # LR test
         df_m = k - 1 if is_con else k
         chi2 = 2 * (ll_val - ll_0)
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
 
-        # 伪 R²
+        # Pseudo R-squared
         pseudo_r2 = 1 - ll_val / ll_0 if ll_0 != 0 else 0.0
 
         return TobitResult(
@@ -144,7 +163,7 @@ class TobitModel(BaseModel):
                 z_rc = np.clip(z_rc, -30, 30)
                 ll_val += np.sum(np.log(1 - sp_stats.norm.cdf(z_rc) + 1e-300))
 
-        # 无删失的观测
+        # Uncensored observations
         mask_unc = np.ones(n, dtype=bool)
         if ll is not None:
             mask_unc &= (y > ll)
@@ -162,10 +181,10 @@ class TobitModel(BaseModel):
 
     def _fit_null_model(self, y, n, ll, ul, is_con):
         """Fit constant-only model to get ll_0."""
-        # 仅常数项模型：只有截距，X = np.ones(n)
+        # Constant-only model: only intercept, X = np.ones(n)
         X_null = np.ones((n, 1))
 
-        # 初始值
+        # Initial values
         y_mean = np.mean(y)
         resid = y - y_mean
         sigma_init = np.std(resid, ddof=1)

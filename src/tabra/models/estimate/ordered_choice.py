@@ -21,6 +21,19 @@ class OrderedChoiceModel(BaseModel):
     """Base class for ordered choice models (oprobit/ologit) estimated via MLE."""
 
     def fit(self, df, y, x, is_con=True, max_iter=300, tol=1e-8):
+        """Fit an ordered choice model via MLE.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Ordinal dependent variable name.
+            x (list[str]): Independent variable names.
+            is_con (bool): Whether to include a constant term. Default True.
+            max_iter (int): Maximum optimizer iterations. Default 300.
+            tol (float): Convergence tolerance. Default 1e-8.
+
+        Returns:
+            OrderedChoiceResult: Estimation result.
+        """
         df = self._prepare_df(df, y, x)
         y_vec = df[y].values.astype(int)
         X = df[x].values.astype(float)

@@ -32,7 +32,7 @@ class PlotTemplate:
     marker_size: float = 20.0
     grid: bool = False
 
-    # Spines (边框)
+    # Spines
     spine_top: bool = True
     spine_right: bool = True
     tick_direction: str = "out"  # "in", "out", "inout"

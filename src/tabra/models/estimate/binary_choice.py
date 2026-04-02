@@ -20,6 +20,23 @@ class BinaryChoiceModel(BaseModel):
     """Base class for binary choice models (probit/logit) estimated via MLE."""
 
     def fit(self, df, y, x, is_con=True, max_iter=100, tol=1e-8):
+        """Fit a binary choice model via MLE (Newton-Raphson).
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Binary dependent variable name (0/1).
+            x (list[str]): Independent variable names.
+            is_con (bool): Whether to include a constant term. Default True.
+            max_iter (int): Maximum number of iterations. Default 100.
+            tol (float): Convergence tolerance. Default 1e-8.
+
+        Returns:
+            BinaryChoiceResult: Estimation result with coefficients, std errors, etc.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = ProbitModel().fit(dta._df, "foreign", ["price", "weight"])
+        """
         df = self._prepare_df(df, y, x)
         y_vec = df[y].values.astype(float)
         X = df[x].values.astype(float)

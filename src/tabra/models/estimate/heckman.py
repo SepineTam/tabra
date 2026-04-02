@@ -20,6 +20,27 @@ class HeckmanModel(BaseModel):
 
     def fit(self, df, y, x, select_x, select_var=None,
             is_con=True, method="mle", max_iter=500, tol=1e-8):
+        """Fit a Heckman selection model.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Outcome variable name.
+            x (list[str]): Outcome equation independent variable names.
+            select_x (list[str]): Selection equation independent variable names.
+            select_var (str): Binary selection indicator variable name.
+                If None, missing y values indicate non-selection.
+            is_con (bool): Whether to include constant terms. Default True.
+            method (str): Estimation method. One of "mle", "twostep". Default "mle".
+            max_iter (int): Maximum optimizer iterations. Default 500.
+            tol (float): Convergence tolerance. Default 1e-8.
+
+        Returns:
+            HeckmanResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = HeckmanModel().fit(dta._df, "price", ["weight"], select_x=["mpg", "weight"])
+        """
         # Only drop NaN from x and select_x (NOT y — y can be NaN for unselected)
         use_cols = list(x) + list(select_x)
         if select_var is not None:
@@ -40,7 +61,7 @@ class HeckmanModel(BaseModel):
             X_select = np.column_stack([X_select, np.ones(X_select.shape[0])])
             select_var_names = select_var_names + ["_cons"]
 
-        # 确定选择指示变量
+        # Determine selection indicator
         if select_var is not None:
             selected = df[select_var].values.astype(float)
             selected = (selected != 0).astype(float)
@@ -71,7 +92,7 @@ class HeckmanModel(BaseModel):
         k_out = X_outcome.shape[1]
         k_sel = X_select.shape[1]
 
-        # 分离选中和未选中
+        # Separate selected and non-selected
         mask_sel = selected == 1
         mask_nsel = selected == 0
         y_obs = y_vec[mask_sel]
@@ -91,7 +112,7 @@ class HeckmanModel(BaseModel):
             if sigma < 1e-10:
                 return -1e15
 
-            # 选中观测
+            # Selected observations
             resid = y_obs - X_out_obs @ beta
             a = resid / sigma
             rho2 = rho ** 2
@@ -109,7 +130,7 @@ class HeckmanModel(BaseModel):
                 + np.log(Phi_arg)
             )
 
-            # 未选中观测
+            # Non-selected observations
             xb_nobs = X_sel_nobs @ gamma
             xb_nobs = np.clip(xb_nobs, -20, 20)
             Phi_neg = sp_stats.norm.cdf(-xb_nobs)
@@ -135,7 +156,7 @@ class HeckmanModel(BaseModel):
             resid = y_obs - X_out_obs @ beta
             a = resid / sigma
 
-            # 选中观测的梯度
+            # Gradient for selected observations
             arg = (X_sel_obs @ gamma + rho * a) / denom
             arg = np.clip(arg, -20, 20)
             Phi_arg = sp_stats.norm.cdf(arg)
@@ -161,13 +182,13 @@ class HeckmanModel(BaseModel):
                 (a * denom - rho * (X_sel_obs @ gamma + rho * a) * (-rho) / denom)
                 / (denom ** 2 + 1e-15)
                 * d_rho_d_athrho
-                + rho * a / sigma * 0  # 简化
+                + rho * a / sigma * 0  # simplified
             ))
 
-            # 更精确的 d(ll)/d(athrho)
+            # More precise d(ll)/d(athrho)
             w_gamma = X_sel_obs @ gamma
             # d(arg)/d(rho) = a/d - rho*(w_gamma + rho*a)*rho/(d^3)
-            # 但更简单:
+            # but simpler:
             # arg = (w_gamma + rho*a) / d
             # d(arg)/d(rho) = (a*d - (w_gamma + rho*a)*(-rho)/d) / d^2
             #                = (a*d^2 + rho*(w_gamma + rho*a)) / d^3
@@ -181,7 +202,7 @@ class HeckmanModel(BaseModel):
             )
             g_lnsigma_sel += np.sum(lambda_arg * (-rho * a / (denom + 1e-15)) * (-a / sigma) * sigma)
 
-            # 未选中观测的梯度
+            # Gradient for non-selected observations
             xb_nobs = X_sel_nobs @ gamma
             xb_nobs_c = np.clip(xb_nobs, -20, 20)
             Phi_neg = sp_stats.norm.cdf(-xb_nobs_c)
@@ -203,7 +224,7 @@ class HeckmanModel(BaseModel):
 
             return grad
 
-        # 初始化
+        # Initialize
         x0 = np.zeros(k_out + k_sel + 2)
         try:
             x0[:k_out] = np.linalg.lstsq(X_out_obs, y_obs, rcond=None)[0]
@@ -212,12 +233,12 @@ class HeckmanModel(BaseModel):
         resid_init = y_obs - X_out_obs @ x0[:k_out]
         x0[k_out + k_sel + 1] = np.log(max(np.std(resid_init), 0.1))
 
-        # 优化: 先用 L-BFGS-B 粗搜索
+        # Optimize: first L-BFGS-B coarse search
         bounds = [(None, None)] * (k_out + k_sel) + [(-5, 5), (-5, 5)]
         res1 = minimize(neg_ll, x0, method='L-BFGS-B', bounds=bounds,
                         options={'maxiter': max_iter, 'ftol': 1e-12})
 
-        # 再用 Nelder-Mead 精细化
+        # Then Nelder-Mead refinement
         res = minimize(neg_ll, res1.x, method='Nelder-Mead',
                        options={'maxiter': max_iter * 4, 'xatol': 1e-10,
                                 'fatol': 1e-10})
@@ -235,7 +256,7 @@ class HeckmanModel(BaseModel):
         sigma = np.exp(lnsigma)
         lambda_ = rho * sigma
 
-        # 用数值 Hessian 计算标准误
+        # Compute standard errors via numerical Hessian
         n_params = len(params_opt)
         h = 1e-5
         H = np.zeros((n_params, n_params))
@@ -286,7 +307,7 @@ class HeckmanModel(BaseModel):
         z_stat = params_opt / se_all
         p_value = 2 * (1 - sp_stats.norm.cdf(np.abs(z_stat)))
 
-        # 分离各部分标准误
+        # Split standard errors by component
         outcome_se = se_all[:k_out]
         select_se = se_all[k_out:k_out + k_sel]
         athrho_se = se_all[k_out + k_sel]
@@ -298,7 +319,7 @@ class HeckmanModel(BaseModel):
         outcome_p = p_value[:k_out]
         select_p = p_value[k_out:k_out + k_sel]
 
-        # Wald chi2 检验（检验结果方程系数除常数项外是否为 0）
+        # Wald chi2 test for outcome equation coefficients (excluding constant)
         df_m = k_out - 1 if is_con else k_out
         R = np.zeros((df_m, n_params))
         for i in range(df_m):
@@ -313,11 +334,11 @@ class HeckmanModel(BaseModel):
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
 
         # LR test of independent equations (rho=0)
-        # 约束模型: rho=0 即 athrho=0
+        # Constrained model: rho=0, i.e. athrho=0
         params_constrained = params_opt.copy()
         params_constrained[k_out + k_sel] = 0.0  # athrho = 0
 
-        # 重跑约束优化
+        # Re-run constrained optimization
         def neg_ll_constrained(params_free):
             params_full = params_opt.copy()
             idx = 0
@@ -337,14 +358,14 @@ class HeckmanModel(BaseModel):
         lr_chi2 = max(lr_chi2, 0)
         lr_pval = 1 - sp_stats.chi2.cdf(lr_chi2, 1)
 
-        # rho/sigma 的标准误用 delta method
+        # Standard errors for rho/sigma via delta method
         # rho = tanh(athrho), se(rho) = se(athrho) * (1 - rho^2)
         rho_se = athrho_se * (1 - rho**2)
         # sigma = exp(lnsigma), se(sigma) = se(lnsigma) * sigma
         sigma_se = lnsigma_se * sigma
         # lambda = rho * sigma
         # var(lambda) = sigma^2 * var(rho) + rho^2 * var(sigma) + 2*rho*sigma*cov(rho,sigma)
-        # 近似: 从 V 矩阵获取
+        # Approximate: from V matrix
         idx_athrho = k_out + k_sel
         idx_lnsigma = k_out + k_sel + 1
         # delta method: lambda = tanh(a) * exp(s)
@@ -402,7 +423,7 @@ class HeckmanModel(BaseModel):
         X_out_obs = X_outcome[mask_sel]
         X_sel_obs = X_select[mask_sel]
 
-        # 第一步: Probit
+        # Step 1: Probit
         from scipy.optimize import minimize as sp_minimize
 
         def probit_neg_ll(gamma):
@@ -417,7 +438,7 @@ class HeckmanModel(BaseModel):
                                  options={'maxiter': 200, 'ftol': 1e-12})
         gamma = res_probit.x
 
-        # 计算 IMR
+        # Compute IMR
         xb_sel = X_sel_obs @ gamma
         xb_sel = np.clip(xb_sel, -20, 20)
         phi_sel = sp_stats.norm.pdf(xb_sel)
@@ -425,7 +446,7 @@ class HeckmanModel(BaseModel):
         Phi_sel = np.clip(Phi_sel, 1e-15, 1)
         imr = phi_sel / Phi_sel
 
-        # 第二步: OLS (y_obs = X_out_obs * beta + theta * imr + eps)
+        # Step 2: OLS (y_obs = X_out_obs * beta + theta * imr + eps)
         X_aug = np.column_stack([X_out_obs, imr])
         beta_aug = np.linalg.lstsq(X_aug, y_obs, rcond=None)[0]
         beta = beta_aug[:k_out]
@@ -436,16 +457,16 @@ class HeckmanModel(BaseModel):
         k_aug = X_aug.shape[1]
         sigma_resid = np.sqrt(np.sum(resid**2) / (n_sel - k_aug))
 
-        # rho 和 sigma
+        # rho and sigma
         sigma_hat = np.sqrt(np.var(resid) + theta**2)
         rho_hat = theta / sigma_hat
 
-        # 截断 rho 到 [-1, 1]
+        # Truncate rho to [-1, 1]
         rho_hat = np.clip(rho_hat, -1, 1)
 
         lambda_hat = rho_hat * sigma_hat
 
-        # 标准误（简化版本）
+        # Standard errors (simplified version)
         XtX_inv = np.linalg.inv(X_aug.T @ X_aug)
         V_aug = sigma_resid**2 * XtX_inv
         se_aug = np.sqrt(np.maximum(np.diag(V_aug), 0))
@@ -456,7 +477,7 @@ class HeckmanModel(BaseModel):
         outcome_z = beta / np.maximum(outcome_se, 1e-15)
         outcome_p = 2 * (1 - sp_stats.norm.cdf(np.abs(outcome_z)))
 
-        # 选择方程标准误 from probit Hessian
+        # Selection equation standard errors from probit Hessian
         xb_all = X_select @ gamma
         xb_all = np.clip(xb_all, -20, 20)
         p_all = sp_stats.norm.cdf(xb_all)

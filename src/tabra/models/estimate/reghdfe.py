@@ -17,6 +17,27 @@ class RegHDFE(BaseModel):
 
     def fit(self, df, y, x, absorb, vce="unadjusted", cluster=None,
             tolerance=1e-8, max_iter=10000, is_con=True):
+        """Fit a linear model with high-dimensional fixed effects via HDFE.
+
+        Args:
+            df (pd.DataFrame): Input dataset.
+            y (str): Dependent variable name.
+            x (list[str]): Independent variable names.
+            absorb (list[str]): Variables to absorb as fixed effects.
+            vce (str): Variance-covariance estimator type. One of "unadjusted",
+                "robust", "cluster". Default "unadjusted".
+            cluster (list[str]): Cluster variable names. Required when vce="cluster".
+            tolerance (float): MAP convergence tolerance. Default 1e-8.
+            max_iter (int): Maximum MAP iterations. Default 10000.
+            is_con (bool): Whether to include a constant term. Default True.
+
+        Returns:
+            RegHDFEResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("nlswork")
+            >>> result = RegHDFE().fit(dta._df, "ln_wage", ["age", "tenure"], absorb=["idcode", "year"])
+        """
         x_cols = list(x)
         absorb_cols = list(absorb)
         df_clean = self._prepare_df(df, y, x, extra_cols=absorb_cols).reset_index(drop=True)
