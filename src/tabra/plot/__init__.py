@@ -10,6 +10,9 @@
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
+
+from tabra.plot.fig_setting import PlotKind
 
 
 class TabraFigure:
@@ -302,5 +305,108 @@ class PlotOps:
         ax.set_ylabel(ytitle if ytitle is not None else var)
         if title is not None:
             ax.set_title(title)
+        self._apply_template(template, ax)
+        return TabraFigure(fig, tabra=self._tabra)
+
+    def mix(self, layers: list, title: str = None,
+            xtitle: str = None, ytitle: str = None,
+            template=None, fig_setting=None):
+        """Overlay multiple plot layers on a single axes (like Stata twoway).
+
+        Args:
+            layers (list): List of ``{PlotKind: {kwargs}}`` dicts.
+            title (str): Plot title.
+            xtitle (str): X-axis label.
+            ytitle (str): Y-axis label.
+            template (PlotTemplate): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+
+        Raises:
+            ValueError: If layers is empty or contains incompatible types.
+        """
+        if not layers:
+            raise ValueError("layers must not be empty")
+
+        kinds = [next(iter(d)) for d in layers]
+        has_pie = any(k == PlotKind.pie for k in kinds)
+        if has_pie and len(layers) > 1:
+            raise ValueError("pie cannot be mixed with other plot types")
+
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig, ax = self._make_fig(template)
+        colors = list(template.color_cycle)
+
+        for layer in layers:
+            kind = next(iter(layer))
+            kwargs = dict(layer[kind])
+            color = kwargs.pop("color", None) or template.primary_color
+
+            if kind == PlotKind.scatter:
+                ax.scatter(self._df[kwargs["x"]], self._df[kwargs["y"]],
+                           s=template.marker_size, c=color)
+            elif kind == PlotKind.line:
+                x_data = self._df[kwargs["x"]] if "x" in kwargs else self._df.index
+                ax.plot(x_data, self._df[kwargs["y"]], color=color)
+            elif kind == PlotKind.bar:
+                by = kwargs.get("by")
+                var = kwargs["var"]
+                if by:
+                    agg = self._df.groupby(by)[var].agg(
+                        kwargs.get("stat", "mean")).sort_values()
+                    ax.bar(agg.index.astype(str), agg.values,
+                           color=color, edgecolor="white", linewidth=0.5)
+                else:
+                    counts = self._df[var].value_counts().sort_index()
+                    ax.bar(counts.index.astype(str), counts.values,
+                           color=color, edgecolor="white", linewidth=0.5)
+            elif kind == PlotKind.hist:
+                ax.hist(self._df[kwargs["var"]].dropna(),
+                        bins=kwargs.get("bins", 30),
+                        density=kwargs.get("density", False),
+                        color=color, edgecolor="white", linewidth=0.5,
+                        alpha=0.5)
+            elif kind == PlotKind.pie:
+                counts = self._df[kwargs["var"]].value_counts()
+                ax.pie(counts.values, labels=counts.index.astype(str),
+                       colors=colors[:len(counts)], autopct="%1.1f%%",
+                       startangle=90)
+                ax.set_aspect("equal")
+            elif kind in (PlotKind.lfit, PlotKind.lfitci):
+                x_col = self._df[kwargs["x"]].dropna()
+                y_col = self._df[kwargs["y"]].dropna()
+                mask = x_col.index.intersection(y_col.index)
+                xv = x_col.loc[mask].values.astype(float)
+                yv = y_col.loc[mask].values.astype(float)
+                # OLS: y = intercept + slope * x
+                n = len(xv)
+                x_mean = xv.mean()
+                ssx = ((xv - x_mean) ** 2).sum()
+                slope = ((xv - x_mean) * (yv - yv.mean())).sum() / ssx
+                intercept = yv.mean() - slope * x_mean
+                # sort for clean line
+                order = np.argsort(xv)
+                xs = xv[order]
+                ys = intercept + slope * xs
+                if kind == PlotKind.lfitci:
+                    # CI: se(y_hat) = sqrt(MSE * (1/n + (x-x_mean)^2/SSx))
+                    y_hat = intercept + slope * xv
+                    mse = ((yv - y_hat) ** 2).sum() / max(n - 2, 1)
+                    se = np.sqrt(mse * (1 / n + (xs - x_mean) ** 2 / ssx))
+                    t_val = 1.96  # approx 95% CI
+                    ax.fill_between(xs, ys - t_val * se, ys + t_val * se,
+                                    color=color, alpha=0.15)
+                ax.plot(xs, ys, color=color)
+
+        if title is not None:
+            ax.set_title(title)
+        if xtitle is not None:
+            ax.set_xlabel(xtitle)
+        if ytitle is not None:
+            ax.set_ylabel(ytitle)
         self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)

@@ -8,6 +8,19 @@
 # @File   : fig_setting.py
 
 from dataclasses import dataclass
+from enum import Enum
+
+
+class PlotKind(Enum):
+    """Supported plot types for tab.plot.mix()."""
+    scatter = "scatter"
+    line = "line"
+    hist = "hist"
+    bar = "bar"
+    violin = "violin"
+    pie = "pie"
+    lfit = "lfit"
+    lfitci = "lfitci"
 
 
 @dataclass
