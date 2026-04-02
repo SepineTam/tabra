@@ -13,6 +13,7 @@ import pandas as pd
 from tabra.models.estimate.ols import OLS
 from tabra.models.estimate.panel import PanelModel
 from tabra.models.estimate.reghdfe import RegHDFE
+from tabra.models.estimate.binary_choice import ProbitModel, LogitModel
 
 
 class TabraData:
@@ -78,6 +79,24 @@ class TabraData:
             raise ValueError("请先调用 xeset() 设置面板变量")
         panel_model = PanelModel()
         result = panel_model.fit(self._df, y, x, self._panel_var, model=model, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def probit(self, y: str, x: list[str], is_con: bool = True):
+        model = ProbitModel()
+        result = model.fit(self._df, y, x, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def logit(self, y: str, x: list[str], is_con: bool = True):
+        model = LogitModel()
+        result = model.fit(self._df, y, x, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:
