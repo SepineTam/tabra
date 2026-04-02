@@ -309,3 +309,110 @@ class DataOps:
 
         self._append(other_df)
         return self
+
+    def sort(self, vars):
+        """
+        Sort DataFrame by variable(s) in ascending order.
+
+        Parameters
+        ----------
+        vars : str or list
+            Variable name(s) to sort by.
+
+        Returns
+        -------
+        self : DataOps
+            Returns self for method chaining.
+        """
+        vars_list = self._parse_vars(vars)
+        for var in vars_list:
+            if var not in self._tabra._df.columns:
+                raise KeyError(f"Variable '{var}' not found in DataFrame")
+
+        self._tabra._df = self._tabra._df.sort_values(
+            vars_list, ignore_index=True, na_position="last",
+        )
+        return self
+
+    def gsort(self, spec):
+        """
+        Sort with flexible ascending/descending per variable.
+
+        Mimics Stata's gsort: prefix ``+`` (or no prefix) for ascending,
+        ``-`` for descending.
+
+        Parameters
+        ----------
+        spec : str
+            Sort spec, e.g. ``"-wage +age"`` or ``"wage -age"``.
+
+        Returns
+        -------
+        self : DataOps
+            Returns self for method chaining.
+        """
+        parts = spec.split()
+        cols, ascending = [], []
+        for part in parts:
+            if part.startswith("-"):
+                cols.append(part[1:])
+                ascending.append(False)
+            elif part.startswith("+"):
+                cols.append(part[1:])
+                ascending.append(True)
+            else:
+                cols.append(part)
+                ascending.append(True)
+
+        for col in cols:
+            if col not in self._tabra._df.columns:
+                raise KeyError(f"Variable '{col}' not found in DataFrame")
+
+        self._tabra._df = self._tabra._df.sort_values(
+            cols, ascending=ascending, ignore_index=True, na_position="last",
+        )
+        return self
+
+    def recode(self, var, mapping, *, gen: str = None):
+        """
+        Recode values of a variable using a mapping.
+
+        Parameters
+        ----------
+        var : str
+            Variable name to recode.
+        mapping : dict
+            Mapping of {old_value: new_value}.
+            Keys can be single values or tuples for ranges: {(1, 5): "low"}.
+        gen : str, optional
+            Name for the new variable. If None, overwrite in place.
+
+        Returns
+        -------
+        self : DataOps
+            Returns self for method chaining.
+        """
+        if var not in self._tabra._df.columns:
+            raise KeyError(f"Variable '{var}' not found in DataFrame")
+
+        target = gen if gen is not None else var
+        if gen is not None and gen in self._tabra._df.columns and gen != var:
+            raise ValueError(f"Variable '{gen}' already exists in DataFrame")
+
+        orig = self._tabra._df[var].copy()
+        result = pd.Series(np.nan, index=orig.index, dtype=object)
+        mapped = pd.Series(False, index=orig.index)
+
+        for key, val in mapping.items():
+            if isinstance(key, tuple):
+                lo, hi = key
+                mask = (~mapped) & (orig >= lo) & (orig <= hi)
+            else:
+                mask = (~mapped) & (orig == key)
+            result = result.where(~mask, val)
+            mapped |= mask
+
+        result = result.where(mapped, orig)
+
+        self._tabra._df[target] = result
+        return self

@@ -436,3 +436,138 @@ class TestDataOpsAppend:
         tab.data.append(df2)
         assert tab._df["x"].dtype == np.int64
         assert pd.api.types.is_string_dtype(tab._df["y"])
+
+
+class TestDataOpsSort:
+    @pytest.fixture
+    def sort_df(self):
+        return pd.DataFrame({
+            "x": [3, 1, 2, 1],
+            "y": [40, 20, 30, 10],
+        })
+
+    def test_sort_single_var(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.sort("x")
+        assert list(tab._df["x"]) == [1, 1, 2, 3]
+
+    def test_sort_multiple_vars_string(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.sort("x y")
+        assert list(tab._df["x"]) == [1, 1, 2, 3]
+        assert list(tab._df["y"]) == [10, 20, 30, 40]
+
+    def test_sort_multiple_vars_list(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.sort(["x", "y"])
+        assert list(tab._df["y"]) == [10, 20, 30, 40]
+
+    def test_sort_nonexistent_raises(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        with pytest.raises(KeyError):
+            tab.data.sort("z")
+
+    def test_sort_returns_data_ops(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        result = tab.data.sort("x")
+        assert result is not None
+
+    def test_sort_with_nan(self):
+        df = pd.DataFrame({"x": [3, np.nan, 1, 2]})
+        tab = load_data(df, is_display_result=False)
+        tab.data.sort("x")
+        assert list(tab._df["x"][:3]) == [1.0, 2.0, 3.0]
+        assert pd.isna(tab._df["x"].iloc[3])
+
+    def test_gsort_descending(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.gsort("-x")
+        assert list(tab._df["x"]) == [3, 2, 1, 1]
+
+    def test_gsort_ascending_explicit(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.gsort("+x")
+        assert list(tab._df["x"]) == [1, 1, 2, 3]
+
+    def test_gsort_mixed(self):
+        df = pd.DataFrame({"x": [1, 1, 2, 2], "y": [10, 30, 20, 40]})
+        tab = load_data(df, is_display_result=False)
+        tab.data.gsort("+x -y")
+        assert list(tab._df["x"]) == [1, 1, 2, 2]
+        assert list(tab._df["y"]) == [30, 10, 40, 20]
+
+    def test_gsort_no_prefix_means_asc(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.gsort("x")
+        assert list(tab._df["x"]) == [1, 1, 2, 3]
+
+    def test_gsort_nonexistent_raises(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        with pytest.raises(KeyError):
+            tab.data.gsort("-z")
+
+    def test_gsort_returns_data_ops(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        result = tab.data.gsort("-x")
+        assert result is not None
+
+    def test_sort_chaining(self, sort_df):
+        tab = load_data(sort_df, is_display_result=False)
+        tab.data.sort("x").drop("y")
+        assert list(tab._df["x"]) == [1, 1, 2, 3]
+        assert "y" not in tab._df.columns
+
+
+class TestDataOpsRecode:
+    @pytest.fixture
+    def recode_df(self):
+        return pd.DataFrame({"edu": [1, 2, 3, 4, 5], "income": [100, 200, 300, 400, 500]})
+
+    def test_recode_simple(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        tab.data.recode("edu", {1: 0, 2: 0, 3: 1, 4: 1, 5: 2})
+        assert list(tab._df["edu"]) == [0, 0, 1, 1, 2]
+
+    def test_recode_with_gen(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        tab.data.recode("edu", {1: "low", 2: "low", 3: "mid", 4: "mid", 5: "high"}, gen="edu_group")
+        assert "edu_group" in tab._df.columns
+        assert list(tab._df["edu_group"]) == ["low", "low", "mid", "mid", "high"]
+        assert list(tab._df["edu"]) == [1, 2, 3, 4, 5]
+
+    def test_recode_range_key(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        tab.data.recode("edu", {(1, 2): "low", (3, 4): "mid", (5, 5): "high"})
+        assert list(tab._df["edu"]) == ["low", "low", "mid", "mid", "high"]
+
+    def test_recode_overwrite_inplace(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        tab.data.recode("edu", {1: 10, 2: 20})
+        assert tab._df.loc[0, "edu"] == 10
+        assert tab._df.loc[1, "edu"] == 20
+        assert tab._df.loc[2, "edu"] == 3  # unmapped stays
+
+    def test_recode_gen_existing_raises(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        with pytest.raises(ValueError):
+            tab.data.recode("edu", {1: 0}, gen="income")
+
+    def test_recode_nonexistent_var_raises(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        with pytest.raises(KeyError):
+            tab.data.recode("z", {1: 0})
+
+    def test_recode_returns_data_ops(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        result = tab.data.recode("edu", {1: 0})
+        assert result is not None
+
+    def test_recode_chaining(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        tab.data.recode("edu", {1: 0, 2: 0, 3: 1, 4: 1, 5: 2}).sort("income")
+        assert list(tab._df["edu"]) == [0, 0, 1, 1, 2]
+
+    def test_recode_mixed_range_and_single(self, recode_df):
+        tab = load_data(recode_df, is_display_result=False)
+        tab.data.recode("edu", {(1, 2): "low", 3: "mid", (4, 5): "high"})
+        assert list(tab._df["edu"]) == ["low", "low", "mid", "high", "high"]
