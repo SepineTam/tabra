@@ -18,6 +18,7 @@ class PanelModel(BaseModel):
         super().__init__()
 
     def fit(self, df, y, x, panel_var, model="fe", is_con=True):
+        df = self._prepare_df(df, y, x, extra_cols=[panel_var])
         dispatch = {
             "fe": self._fit_fe,
             "re": self._fit_re,

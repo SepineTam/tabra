@@ -14,6 +14,13 @@ class BaseModel(ABC):
     def __init__(self):
         pass
 
+    @staticmethod
+    def _prepare_df(df, y, x, extra_cols=None):
+        use_cols = [y] + list(x)
+        if extra_cols:
+            use_cols.extend(extra_cols)
+        return df[use_cols].dropna()
+
     @abstractmethod
     def fit(self, df, y, x, **kwargs):
         raise NotImplementedError

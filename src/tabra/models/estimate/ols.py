@@ -16,6 +16,7 @@ from tabra.results.ols_result import OLSResult
 
 class OLS(BaseModel):
     def fit(self, df, y, x, is_con=True):
+        df = self._prepare_df(df, y, x)
         y_vec = df[y].values.reshape(-1, 1).astype(float)
         X = df[x].values.astype(float)
         var_names = list(x)

@@ -19,10 +19,7 @@ class RegHDFE(BaseModel):
             tolerance=1e-8, max_iter=10000, is_con=True):
         x_cols = list(x)
         absorb_cols = list(absorb)
-        all_cols = [y] + x_cols + absorb_cols
-
-        # Drop rows with missing values
-        df_clean = df[all_cols].dropna().reset_index(drop=True)
+        df_clean = self._prepare_df(df, y, x, extra_cols=absorb_cols).reset_index(drop=True)
 
         y_vec = df_clean[y].values.astype(float)
         X = df_clean[x_cols].values.astype(float)

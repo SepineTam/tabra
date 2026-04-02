@@ -20,6 +20,13 @@ class HeckmanModel(BaseModel):
 
     def fit(self, df, y, x, select_x, select_var=None,
             is_con=True, method="mle", max_iter=500, tol=1e-8):
+        # Only drop NaN from x and select_x (NOT y — y can be NaN for unselected)
+        use_cols = list(x) + list(select_x)
+        if select_var is not None:
+            use_cols.append(select_var)
+        valid_idx = df[use_cols].dropna().index
+        df = df.loc[valid_idx]
+
         y_vec = df[y].values.astype(float)
         X_outcome = df[x].values.astype(float)
         X_select = df[select_x].values.astype(float)

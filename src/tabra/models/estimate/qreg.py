@@ -16,6 +16,7 @@ from tabra.results.qreg_result import QRegResult
 
 class QuantileRegression(BaseModel):
     def fit(self, df, y, x, quantile=0.5, is_con=True):
+        df = self._prepare_df(df, y, x)
         tau = quantile
         y_vec = df[y].values.astype(float)
         X = df[x].values.astype(float)

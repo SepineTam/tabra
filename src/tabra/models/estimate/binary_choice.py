@@ -20,6 +20,7 @@ class BinaryChoiceModel(BaseModel):
     """Base class for binary choice models (probit/logit) estimated via MLE."""
 
     def fit(self, df, y, x, is_con=True, max_iter=100, tol=1e-8):
+        df = self._prepare_df(df, y, x)
         y_vec = df[y].values.astype(float)
         X = df[x].values.astype(float)
         var_names = list(x)
