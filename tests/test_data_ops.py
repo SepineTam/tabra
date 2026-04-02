@@ -571,3 +571,224 @@ class TestDataOpsRecode:
         tab = load_data(recode_df, is_display_result=False)
         tab.data.recode("edu", {(1, 2): "low", 3: "mid", (4, 5): "high"})
         assert list(tab._df["edu"]) == ["low", "low", "mid", "high", "high"]
+
+
+class TestDataOpsEgen:
+    @pytest.fixture
+    def egen_df(self):
+        return pd.DataFrame({
+            "wage": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+            "industry": ["A", "A", "B", "B", "C", "C"],
+            "year": [2000, 2001, 2000, 2001, 2000, 2001],
+        })
+
+    @pytest.fixture
+    def egen_nan_df(self):
+        return pd.DataFrame({
+            "x": [1.0, np.nan, 3.0, 4.0, np.nan, 6.0],
+            "g": ["A", "A", "B", "B", "A", "B"],
+        })
+
+    # --- mean ---
+    def test_egen_mean_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("mean_wage", "mean", "wage")
+        expected = np.mean([10, 20, 30, 40, 50, 60])
+        np.testing.assert_array_almost_equal(tab._df["mean_wage"].values, expected)
+
+    def test_egen_mean_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("mean_wage", "mean", "wage", by="industry")
+        # A: mean(10,20)=15, B: mean(30,40)=35, C: mean(50,60)=55
+        expected = [15.0, 15.0, 35.0, 35.0, 55.0, 55.0]
+        np.testing.assert_array_almost_equal(tab._df["mean_wage"].values, expected)
+
+    def test_egen_mean_by_multiple_groups_string(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("mean_wage", "mean", "wage", by="industry year")
+        # each (industry, year) has one obs, so mean equals the obs itself
+        np.testing.assert_array_almost_equal(tab._df["mean_wage"].values, egen_df["wage"].values)
+
+    def test_egen_mean_by_multiple_groups_list(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("mean_wage", "mean", "wage", by=["industry", "year"])
+        np.testing.assert_array_almost_equal(tab._df["mean_wage"].values, egen_df["wage"].values)
+
+    # --- sum / total ---
+    def test_egen_sum_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("total_wage", "sum", "wage")
+        expected = 10 + 20 + 30 + 40 + 50 + 60
+        np.testing.assert_array_almost_equal(tab._df["total_wage"].values, expected)
+
+    def test_egen_total_alias(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("total_wage", "total", "wage")
+        expected = 10 + 20 + 30 + 40 + 50 + 60
+        np.testing.assert_array_almost_equal(tab._df["total_wage"].values, expected)
+
+    def test_egen_sum_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("total_wage", "sum", "wage", by="industry")
+        expected = [30.0, 30.0, 70.0, 70.0, 110.0, 110.0]
+        np.testing.assert_array_almost_equal(tab._df["total_wage"].values, expected)
+
+    # --- max ---
+    def test_egen_max_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("max_wage", "max", "wage")
+        np.testing.assert_array_almost_equal(tab._df["max_wage"].values, 60.0)
+
+    def test_egen_max_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("max_wage", "max", "wage", by="industry")
+        expected = [20.0, 20.0, 40.0, 40.0, 60.0, 60.0]
+        np.testing.assert_array_almost_equal(tab._df["max_wage"].values, expected)
+
+    # --- min ---
+    def test_egen_min_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("min_wage", "min", "wage")
+        np.testing.assert_array_almost_equal(tab._df["min_wage"].values, 10.0)
+
+    def test_egen_min_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("min_wage", "min", "wage", by="industry")
+        expected = [10.0, 10.0, 30.0, 30.0, 50.0, 50.0]
+        np.testing.assert_array_almost_equal(tab._df["min_wage"].values, expected)
+
+    # --- sd ---
+    def test_egen_sd_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("sd_wage", "sd", "wage")
+        expected = np.std([10, 20, 30, 40, 50, 60], ddof=1)
+        np.testing.assert_array_almost_equal(tab._df["sd_wage"].values, expected)
+
+    def test_egen_sd_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("sd_wage", "sd", "wage", by="industry")
+        # A: sd(10,20)=7.07..., B: sd(30,40)=7.07..., C: sd(50,60)=7.07...
+        expected_sd = np.std([10, 20], ddof=1)
+        expected = [expected_sd] * 6
+        np.testing.assert_array_almost_equal(tab._df["sd_wage"].values, expected)
+
+    # --- count ---
+    def test_egen_count_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("cnt", "count", "wage")
+        np.testing.assert_array_almost_equal(tab._df["cnt"].values, 6.0)
+
+    def test_egen_count_with_nan(self, egen_nan_df):
+        tab = load_data(egen_nan_df, is_display_result=False)
+        tab.data.egen("cnt", "count", "x")
+        # total non-NaN: 4
+        np.testing.assert_array_almost_equal(tab._df["cnt"].values, 4.0)
+
+    def test_egen_count_by_group_with_nan(self, egen_nan_df):
+        tab = load_data(egen_nan_df, is_display_result=False)
+        tab.data.egen("cnt", "count", "x", by="g")
+        # A: x=[1, NaN, NaN] -> count=1; B: x=[3, 4, 6] -> count=3
+        expected = [1.0, 1.0, 3.0, 3.0, 1.0, 3.0]
+        np.testing.assert_array_almost_equal(tab._df["cnt"].values, expected)
+
+    # --- median ---
+    def test_egen_median_full_sample(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("med_wage", "median", "wage")
+        np.testing.assert_array_almost_equal(tab._df["med_wage"].values, 35.0)
+
+    def test_egen_median_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("med_wage", "median", "wage", by="industry")
+        expected = [15.0, 15.0, 35.0, 35.0, 55.0, 55.0]
+        np.testing.assert_array_almost_equal(tab._df["med_wage"].values, expected)
+
+    # --- rank ---
+    def test_egen_rank(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("rank_wage", "rank", "wage")
+        expected = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        np.testing.assert_array_almost_equal(tab._df["rank_wage"].values, expected)
+
+    def test_egen_rank_ties(self):
+        df = pd.DataFrame({"x": [10.0, 20.0, 20.0, 30.0]})
+        tab = load_data(df, is_display_result=False)
+        tab.data.egen("r", "rank", "x")
+        # average tie-breaking: both 20s get rank 2.5
+        expected = [1.0, 2.5, 2.5, 4.0]
+        np.testing.assert_array_almost_equal(tab._df["r"].values, expected)
+
+    def test_egen_rank_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("rank_wage", "rank", "wage", by="industry")
+        # A: [10,20]->[1,2], B: [30,40]->[1,2], C: [50,60]->[1,2]
+        expected = [1.0, 2.0, 1.0, 2.0, 1.0, 2.0]
+        np.testing.assert_array_almost_equal(tab._df["rank_wage"].values, expected)
+
+    # --- group ---
+    def test_egen_group_two_vars(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("gid", "group", ["industry", "year"])
+        # 6 unique combos -> IDs 1..6 (order doesn't matter, just uniqueness & range)
+        assert set(tab._df["gid"].values) == {1, 2, 3, 4, 5, 6}
+
+    def test_egen_group_single_var(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("gid", "group", ["industry"])
+        assert set(tab._df["gid"].values) == {1, 2, 3}
+
+    def test_egen_group_consistent(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("gid", "group", ["industry"])
+        # same industry should get same id
+        assert tab._df.loc[0, "gid"] == tab._df.loc[1, "gid"]  # both A
+        assert tab._df.loc[2, "gid"] == tab._df.loc[3, "gid"]  # both B
+
+    # --- seq ---
+    def test_egen_seq_no_group(self):
+        df = pd.DataFrame({"x": [1, 2, 3, 4, 5]})
+        tab = load_data(df, is_display_result=False)
+        tab.data.egen("sid", "seq", "x")
+        np.testing.assert_array_almost_equal(tab._df["sid"].values, [1, 2, 3, 4, 5])
+
+    def test_egen_seq_by_group(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("sid", "seq", "wage", by="industry")
+        # A: [1,2], B: [1,2], C: [1,2]
+        expected = [1, 2, 1, 2, 1, 2]
+        np.testing.assert_array_almost_equal(tab._df["sid"].values, expected)
+
+    # --- error cases ---
+    def test_egen_existing_var_raises(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        with pytest.raises(ValueError, match="already exists"):
+            tab.data.egen("wage", "mean", "wage")
+
+    def test_egen_missing_source_raises(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.egen("m", "mean", "nonexistent")
+
+    def test_egen_missing_by_raises(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.egen("m", "mean", "wage", by="nonexistent")
+
+    def test_egen_unknown_func_raises(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        with pytest.raises(ValueError, match="Unknown egen function"):
+            tab.data.egen("m", "oops", "wage")
+
+    # --- chaining & return ---
+    def test_egen_returns_self(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        result = tab.data.egen("mean_wage", "mean", "wage")
+        assert result is not None
+
+    def test_egen_chaining(self, egen_df):
+        tab = load_data(egen_df, is_display_result=False)
+        tab.data.egen("mean_wage", "mean", "wage", by="industry")
+        tab.data.egen("max_wage", "max", "wage", by="industry")
+        tab.data.sort("industry")
+        assert "mean_wage" in tab._df.columns
+        assert "max_wage" in tab._df.columns
