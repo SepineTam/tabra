@@ -245,3 +245,84 @@ class TestDataOpsIntegration:
         tab.data.gen("c", "a + b").replace("c", "0", cond="c > 30")
         assert tab._df.loc[0, "c"] == 11.0
         assert tab._df.loc[3, "c"] == 0
+
+
+class TestDataOpsWinsor2:
+    @pytest.fixture
+    def outlier_df(self):
+        np.random.seed(42)
+        x = np.random.normal(50, 10, 100).tolist()
+        x[0] = 999.0  # extreme upper
+        x[1] = -999.0  # extreme lower
+        return pd.DataFrame({"x": x, "group": ["A"] * 50 + ["B"] * 50})
+
+    def test_winsor_basic(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x")
+        assert "x_w" in tab._df.columns
+        assert tab._df["x_w"].max() < 999.0
+        assert tab._df["x_w"].min() > -999.0
+
+    def test_winsor_replace(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x", replace=True)
+        assert "x_w" not in tab._df.columns
+        assert tab._df["x"].max() < 999.0
+
+    def test_winsor_trim(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x", trim=True)
+        assert "x_w" in tab._df.columns
+        assert tab._df["x_w"].isna().sum() == 2
+
+    def test_winsor_custom_cuts(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x", cuts=(5, 95))
+        assert "x_w" in tab._df.columns
+        assert tab._df["x_w"].max() < 999.0
+
+    def test_winsor_by_group(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x", by="group")
+        assert "x_w" in tab._df.columns
+        assert tab._df["x_w"].max() < 999.0
+
+    def test_winsor_suffix(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x", suffix="_win")
+        assert "x_win" in tab._df.columns
+
+    def test_winsor_prefix(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x", prefix="w_")
+        assert "w_x" in tab._df.columns
+
+    def test_winsor_multiple_vars(self, outlier_df):
+        outlier_df["y"] = outlier_df["x"] * 2
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2(["x", "y"])
+        assert "x_w" in tab._df.columns
+        assert "y_w" in tab._df.columns
+
+    def test_winsor_invalid_cuts_raises(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        with pytest.raises(ValueError):
+            tab.data.winsor2("x", cuts=(99, 1))
+        with pytest.raises(ValueError):
+            tab.data.winsor2("x", cuts=(-1, 99))
+
+    def test_winsor_nonexistent_var_raises(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        with pytest.raises(KeyError):
+            tab.data.winsor2("z")
+
+    def test_winsor_returns_data_ops(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        result = tab.data.winsor2("x")
+        assert result is not None
+
+    def test_winsor_chaining(self, outlier_df):
+        tab = load_data(outlier_df, is_display_result=False)
+        tab.data.winsor2("x").drop("x").rename("x_w", "x")
+        assert "x" in tab._df.columns
+        assert "x_w" not in tab._df.columns

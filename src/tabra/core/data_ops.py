@@ -184,3 +184,93 @@ class DataOps:
 
         self._tabra._df = self._tabra._df.rename(columns={old: new})
         return self
+
+    def winsor2(
+        self,
+        vars,
+        *,
+        cuts=(1, 99),
+        replace: bool = False,
+        trim: bool = False,
+        by: str = None,
+        suffix: str = "_w",
+        prefix: str = None,
+    ):
+        """
+        Winsorize or trim variables at specified percentiles.
+
+        Mimics Stata's winsor2 command.
+
+        Parameters
+        ----------
+        vars : str or list
+            Variable name(s) to winsorize.
+        cuts : tuple of (float, float), optional
+            Lower and upper percentiles. Default (1, 99).
+        replace : bool, optional
+            If True, overwrite existing variables. Default False.
+        trim : bool, optional
+            If True, trim (set to NaN) instead of winsorize (clamp). Default False.
+        by : str, optional
+            Group variable for group-wise winsorization.
+        suffix : str, optional
+            Suffix for new variable names (used when replace=False). Default "_w".
+        prefix : str, optional
+            Prefix for new variable names. Overrides suffix if provided.
+
+        Returns
+        -------
+        self : DataOps
+            Returns self for method chaining.
+        """
+        vars_list = self._parse_vars(vars)
+        df = self._tabra._df.copy()
+
+        if isinstance(cuts, (int, float)):
+            lo_pct, hi_pct = cuts, 100 - cuts
+        else:
+            lo_pct, hi_pct = cuts
+            if len((lo_pct, hi_pct)) != 2:
+                raise ValueError(
+                    f"cuts must be a single number or a (low, high) pair, "
+                    f"got {cuts}"
+                )
+
+        if not (0 <= lo_pct < hi_pct <= 100):
+            raise ValueError(
+                f"Invalid cuts ({lo_pct}, {hi_pct}): "
+                f"must satisfy 0 <= low < high <= 100"
+            )
+
+        for var in vars_list:
+            if var not in df.columns:
+                raise KeyError(f"Variable '{var}' not found in DataFrame")
+
+            if replace:
+                target = var
+            else:
+                if prefix is not None:
+                    target = f"{prefix}{var}"
+                else:
+                    target = f"{var}{suffix}"
+
+            if by is not None:
+                if by not in df.columns:
+                    raise KeyError(f"Group variable '{by}' not found in DataFrame")
+                grouped = df.groupby(by)[var]
+                lo = grouped.transform(lambda s: np.nanpercentile(s, lo_pct))
+                hi = grouped.transform(lambda s: np.nanpercentile(s, hi_pct))
+            else:
+                lo = np.nanpercentile(df[var], lo_pct)
+                hi = np.nanpercentile(df[var], hi_pct)
+
+            col = df[var].copy()
+            if trim:
+                col = col.where((col >= lo) & (col <= hi))
+            else:
+                col = col.clip(lower=lo, upper=hi)
+
+            df[target] = col
+
+        self._tabra._df = df
+        return self
