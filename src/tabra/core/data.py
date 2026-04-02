@@ -12,6 +12,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from tabra.core.config import Config
 from tabra.core.data_ops import DataOps
 from tabra.plot import PlotOps
 from tabra.models.estimate.ols import OLS
@@ -21,6 +22,7 @@ from tabra.models.estimate.binary_choice import ProbitModel, LogitModel
 from tabra.models.estimate.heckman import HeckmanModel
 from tabra.models.estimate.tobit import TobitModel
 from tabra.models.estimate.qreg import QuantileRegression
+from tabra.models.estimate.ordered_choice import OrderedProbitModel, OrderedLogitModel
 
 
 class TabraData:
@@ -42,6 +44,7 @@ class TabraData:
         self._model = None
         self._panel_var = None
         self._time_var = None
+        self._config = Config(self)
 
     @property
     def result(self):
@@ -54,6 +57,10 @@ class TabraData:
     @property
     def data(self) -> DataOps:
         return DataOps(self)
+
+    @property
+    def config(self) -> Config:
+        return self._config
 
     @property
     def plot(self) -> PlotOps:
@@ -153,6 +160,24 @@ class TabraData:
              is_con: bool = True):
         model = QuantileRegression()
         result = model.fit(self._df, y, x, quantile=quantile, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def oprobit(self, y: str, x: list[str], is_con: bool = True):
+        model = OrderedProbitModel()
+        result = model.fit(self._df, y, x, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def ologit(self, y: str, x: list[str], is_con: bool = True):
+        model = OrderedLogitModel()
+        result = model.fit(self._df, y, x, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:
