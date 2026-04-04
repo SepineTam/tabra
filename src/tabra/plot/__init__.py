@@ -238,6 +238,107 @@ class PlotOps:
         self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)
 
+    def lfit(self, y: str, x: str, title: str = None,
+             xtitle: str = None, ytitle: str = None,
+             template=None, fig_setting=None):
+        """Draw a linear fit plot (OLS regression line).
+
+        Args:
+            y (str): Variable name for the y-axis.
+            x (str): Variable name for the x-axis.
+            title (str): Plot title.
+            xtitle (str): X-axis label. Defaults to x variable name.
+            ytitle (str): Y-axis label. Defaults to y variable name.
+            template (PlotTemplate): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+        """
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig, ax = self._make_fig(template)
+
+        xv = self._df[x].dropna().values.astype(float)
+        yv = self._df[y].dropna().values.astype(float)
+        mask = self._df[x].dropna().index.intersection(self._df[y].dropna().index)
+        xv = self._df.loc[mask, x].values.astype(float)
+        yv = self._df.loc[mask, y].values.astype(float)
+
+        x_mean = xv.mean()
+        ssx = ((xv - x_mean) ** 2).sum()
+        slope = ((xv - x_mean) * (yv - yv.mean())).sum() / ssx
+        intercept = yv.mean() - slope * x_mean
+
+        order = np.argsort(xv)
+        xs = xv[order]
+        ys = intercept + slope * xs
+        ax.plot(xs, ys, color=template.primary_color)
+
+        ax.set_xlabel(xtitle if xtitle is not None else x)
+        ax.set_ylabel(ytitle if ytitle is not None else y)
+        if title is not None:
+            ax.set_title(title)
+        self._apply_template(template, ax)
+        return TabraFigure(fig, tabra=self._tabra)
+
+    def lfitci(self, y: str, x: str, title: str = None,
+               xtitle: str = None, ytitle: str = None,
+               level: float = 0.95,
+               template=None, fig_setting=None):
+        """Draw a linear fit plot with confidence interval.
+
+        Args:
+            y (str): Variable name for the y-axis.
+            x (str): Variable name for the x-axis.
+            title (str): Plot title.
+            xtitle (str): X-axis label. Defaults to x variable name.
+            ytitle (str): Y-axis label. Defaults to y variable name.
+            level (float): Confidence level. Default 0.95.
+            template (PlotTemplate): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+        """
+        from scipy.stats import t as t_dist
+
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig, ax = self._make_fig(template)
+
+        mask = self._df[x].dropna().index.intersection(self._df[y].dropna().index)
+        xv = self._df.loc[mask, x].values.astype(float)
+        yv = self._df.loc[mask, y].values.astype(float)
+
+        n = len(xv)
+        x_mean = xv.mean()
+        ssx = ((xv - x_mean) ** 2).sum()
+        slope = ((xv - x_mean) * (yv - yv.mean())).sum() / ssx
+        intercept = yv.mean() - slope * x_mean
+
+        order = np.argsort(xv)
+        xs = xv[order]
+        ys = intercept + slope * xs
+
+        y_hat = intercept + slope * xv
+        mse = ((yv - y_hat) ** 2).sum() / max(n - 2, 1)
+        se = np.sqrt(mse * (1 / n + (xs - x_mean) ** 2 / ssx))
+        t_val = t_dist.ppf((1 + level) / 2, df=max(n - 2, 1))
+
+        ax.fill_between(xs, ys - t_val * se, ys + t_val * se,
+                        color=template.primary_color, alpha=0.15)
+        ax.plot(xs, ys, color=template.primary_color)
+
+        ax.set_xlabel(xtitle if xtitle is not None else x)
+        ax.set_ylabel(ytitle if ytitle is not None else y)
+        if title is not None:
+            ax.set_title(title)
+        self._apply_template(template, ax)
+        return TabraFigure(fig, tabra=self._tabra)
+
     def line(self, y: str, x: str = None, by: str = None,
              title: str = None, xtitle: str = None, ytitle: str = None,
              template=None, fig_setting=None):
