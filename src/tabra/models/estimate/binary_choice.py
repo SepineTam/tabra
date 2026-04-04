@@ -48,8 +48,11 @@ class BinaryChoiceModel(BaseModel):
 
         n, k = X.shape
 
-        # Step 1: Fit constant-only model for ll_0
-        ll_0 = self._fit_null_model(y_vec, is_con)
+        # Step 1: Fit constant-only model for ll_0 (only when constant is included)
+        if is_con:
+            ll_0 = self._fit_null_model(y_vec)
+        else:
+            ll_0 = np.nan
 
         # Step 2: Newton-Raphson / IRLS for full model
         beta = np.zeros(k)
@@ -95,12 +98,15 @@ class BinaryChoiceModel(BaseModel):
         z_stat = beta / std_err
         p_value = 2 * (1 - sp_stats.norm.cdf(np.abs(z_stat)))
 
-        # Pseudo R-squared
-        pseudo_r2 = 1 - ll / ll_0 if ll_0 != 0 else 0.0
+        # Pseudo R-squared and chi2
+        if is_con:
+            pseudo_r2 = 1 - ll / ll_0 if ll_0 != 0 else 0.0
+            chi2 = 2 * (ll - ll_0)
+        else:
+            pseudo_r2 = np.nan
+            chi2 = float(beta @ np.linalg.inv(V) @ beta)
 
-        # LR chi-squared test
         df_m = k - 1 if is_con else k
-        chi2 = 2 * (ll - ll_0)
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
 
         return BinaryChoiceResult(
@@ -124,7 +130,7 @@ class BinaryChoiceModel(BaseModel):
             vce_type="OIM",
         )
 
-    def _fit_null_model(self, y, is_con):
+    def _fit_null_model(self, y):
         """Fit constant-only model to get ll_0."""
         p_bar = np.mean(y)
         p_bar = np.clip(p_bar, 1e-15, 1 - 1e-15)
@@ -178,10 +184,16 @@ class ProbitModel(BinaryChoiceModel):
         xb = X @ beta
         xb = np.clip(xb, -20, 20)
         phi = sp_stats.norm.pdf(xb)
-        # Hessian diagonal weights
-        # lambda = phi^2 / (p*(1-p)) - (y-p) * xb * phi / (p*(1-p))
-        lam = (phi ** 2) / (p * (1 - p)) - (y - p) * xb * phi / (p * (1 - p))
-        W = np.diag(lam)
+        p = np.clip(p, 1e-15, 1 - 1e-15)
+
+        lam = phi / p
+        mu = phi / (1 - p)
+
+        w = np.where(y == 1,
+                     lam * (lam + xb),
+                     mu * (mu - xb))
+
+        W = np.diag(w)
         return -X.T @ W @ X
 
     def _model_name(self):

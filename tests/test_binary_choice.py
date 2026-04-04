@@ -140,9 +140,14 @@ def _scipy_probit_oracle(y, X):
     xb = np.clip(xb, -20, 20)
     p = sp_stats.norm.cdf(xb)
     phi = sp_stats.norm.pdf(xb)
-    # Hessian for probit
-    lam = phi**2 / (p * (1 - p)) + (y - p) * (-xb) * phi / (p * (1 - p))
-    W = np.diag(lam)
+    # Hessian for probit (OIM): same formula as ProbitModel._hessian
+    p = np.clip(p, 1e-15, 1 - 1e-15)
+    lam = phi / p           # inverse Mills ratio for y=1
+    mu = phi / (1 - p)      # for y=0
+    w = np.where(y == 1,
+                 lam * (lam + xb),
+                 mu * (mu - xb))
+    W = np.diag(w)
     H = -X.T @ W @ X
     V = np.linalg.inv(-H)
     se = np.sqrt(np.diag(V))
