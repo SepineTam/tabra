@@ -159,11 +159,11 @@ class DataOps:
             raise ValueError(f"Variable '{new_var}' already exists in DataFrame")
 
         func = func.lower()
-        by_vars = self._parse_vars(by) if by is not None else None
+        by_vars = self._resolve_vars(by) if by is not None else None
 
         # --- group: encode combination into integer IDs ---
         if func == "group":
-            source_vars = self._parse_vars(source)
+            source_vars = self._resolve_vars(source)
             for v in source_vars:
                 if v not in df.columns:
                     raise KeyError(f"Variable '{v}' not found in DataFrame")
@@ -238,7 +238,7 @@ class DataOps:
         Returns:
             DataOps: Returns self for method chaining.
         """
-        vars_list = self._parse_vars(vars)
+        vars_list = self._resolve_vars(vars)
         for var in vars_list:
             if var not in self._tabra._df.columns:
                 raise KeyError(f"Variable '{var}' not found in DataFrame")
@@ -255,7 +255,7 @@ class DataOps:
         Returns:
             DataOps: Returns self for method chaining.
         """
-        vars_list = self._parse_vars(vars)
+        vars_list = self._resolve_vars(vars)
         for var in vars_list:
             if var not in self._tabra._df.columns:
                 raise KeyError(f"Variable '{var}' not found in DataFrame")
@@ -309,7 +309,7 @@ class DataOps:
         Returns:
             DataOps: Returns self for method chaining.
         """
-        vars_list = self._parse_vars(vars)
+        vars_list = self._resolve_vars(vars)
         df = self._tabra._df.copy()
 
         if isinstance(cuts, (int, float)):
@@ -385,7 +385,7 @@ class DataOps:
             >>> tab.data.reshape_long("wage", i="firm", j="year")
             >>> tab.data.reshape_long(["wage", "hours"], i="firm")
         """
-        stubs = self._parse_vars(stub)
+        stubs = self._resolve_vars(stub)
         df = self._tabra._df
 
         if i not in df.columns:
@@ -432,7 +432,7 @@ class DataOps:
             >>> tab.data.reshape_wide("wage", i="firm", j="year")
             >>> tab.data.reshape_wide(["wage", "hours"], i="firm", j="year")
         """
-        stubs = self._parse_vars(stub)
+        stubs = self._resolve_vars(stub)
         df = self._tabra._df
 
         if i not in df.columns:
@@ -511,7 +511,7 @@ class DataOps:
 
         # Parse vars
         if vars is not None:
-            agg_vars = self._parse_vars(vars)
+            agg_vars = self._resolve_vars(vars)
         else:
             agg_vars = df.select_dtypes(include="number").columns.tolist()
 
@@ -521,7 +521,7 @@ class DataOps:
                 raise KeyError(f"Variable '{v}' not found in DataFrame")
 
         # Parse by
-        by_vars = self._parse_vars(by) if by is not None else None
+        by_vars = self._resolve_vars(by) if by is not None else None
         if by_vars is not None:
             for v in by_vars:
                 if v not in df.columns:
@@ -579,7 +579,7 @@ class DataOps:
             )
 
         df = self._tabra._df
-        check_cols = self._parse_vars(vars) if vars is not None else list(df.columns)
+        check_cols = self._resolve_vars(vars) if vars is not None else list(df.columns)
 
         for v in check_cols:
             if v not in df.columns:
@@ -837,7 +837,7 @@ class DataOps:
         Returns:
             DataOps: Returns self for method chaining.
         """
-        vars_list = self._parse_vars(vars)
+        vars_list = self._resolve_vars(vars)
         for var in vars_list:
             if var not in self._tabra._df.columns:
                 raise KeyError(f"Variable '{var}' not found in DataFrame")
