@@ -70,56 +70,100 @@ class RegHDFE(BaseModel):
             y_vec, X, fe_arrays, tolerance=tolerance, max_iter=max_iter
         )
 
-        # OLS on transformed data
-        if is_con:
-            X_tilde_full = np.column_stack([X_tilde, np.ones(n)])
-            var_names = x_cols + ["_cons"]
-        else:
-            X_tilde_full = X_tilde
-            var_names = x_cols
+        # --- Collinearity detection (Bug 3) ---
+        # After MAP, columns with near-zero variance are absorbed by FE
+        col_var = np.var(X_tilde, axis=0)
+        non_collinear = col_var > tolerance
+        omitted_idx = np.where(~non_collinear)[0]
+        active_idx = np.where(non_collinear)[0]
 
-        k_full = X_tilde_full.shape[1]
-        XtX = mat_mul(mat_transpose(X_tilde_full), X_tilde_full)
-        Xty = mat_mul(mat_transpose(X_tilde_full), y_tilde.reshape(-1, 1))
+        x_cols_active = [x_cols[i] for i in active_idx]
+        X_tilde_active = X_tilde[:, active_idx]
+        X_active = X[:, active_idx]
+        k_active = len(active_idx)
+
+        # --- OLS on transformed data, NO constant column (Bug 1) ---
+        XtX = mat_mul(mat_transpose(X_tilde_active), X_tilde_active)
+        Xty = mat_mul(mat_transpose(X_tilde_active), y_tilde.reshape(-1, 1))
         XtX_inv = mat_inv(XtX)
-        beta = mat_mul(XtX_inv, Xty).flatten()
+        beta_slope = mat_mul(XtX_inv, Xty).flatten()
 
-        resid = y_tilde - X_tilde_full @ beta
+        # --- Recover constant term (Bug 1) ---
+        y_mean = float(np.mean(y_vec))
+        x_means = np.mean(X_active, axis=0)
+        b_cons = y_mean - x_means @ beta_slope
+
+        # Residuals in the demeaned space (FE already absorbed)
+        resid = y_tilde - X_tilde_active @ beta_slope
         SSR = float(resid @ resid)
 
-        # DoF adjustment
-        df_a = _compute_df_a(fe_arrays, cluster, vce)
-        df_model = k_full - 1 if is_con else k_full
-        df_resid = n - k_full - df_a
+        # Full coefficient vector: active slopes + omitted (0) + constant
+        beta = np.zeros(k + 1)
+        for j_pos, j_orig in enumerate(active_idx):
+            beta[j_orig] = beta_slope[j_pos]
+        beta[k] = b_cons  # constant is last
+        var_names = x_cols + ["_cons"]
 
-        # Standard errors
+        # DoF adjustment (Bug 2: first FE uses K not K-1)
+        df_a = _compute_df_a(fe_arrays, cluster, vce, fe_names=fe_names)
+        k_full = k + 1  # all original x cols + constant
+        df_model = k_active  # active slopes only
+        df_resid = n - df_a - df_model  # df_a already absorbs constant DoF
+        # For cluster VCE, t/F tests use G-1 as denominator df
+        df_r_test = df_resid
+        # VCE adjustment df: for cluster with nested FE, use nested df_a
+        df_resid_vce = df_resid
+        if vce == "cluster" and cluster is not None:
+            cluster_cols = cluster if isinstance(cluster, list) else [cluster]
+            retained_idx = np.where(mask)[0]
+            _clust_arr = df_clean[cluster_cols[0]].values[retained_idx]
+            if _clust_arr.dtype.kind not in ('i', 'u'):
+                _clust_arr = pd_factorize(_clust_arr)
+            df_r_test = len(np.unique(_clust_arr)) - 1
+            # Compute nested df_a for VCE adjustment
+            df_a_nested = _compute_df_a_nested(fe_arrays, cluster_cols, fe_names)
+            df_resid_vce = n - df_a_nested - df_model
+
+        # --- Standard errors (Bug 1: VCE on demeaned data without constant) ---
         if vce == "unadjusted":
             sigma2 = SSR / df_resid
-            var_beta = sigma2 * XtX_inv
+            var_slope = sigma2 * XtX_inv
+            se_cons = np.sqrt(sigma2 * (1.0 / n + x_means @ XtX_inv @ x_means))
         elif vce == "robust":
-            var_beta = _robust_vce(X_tilde_full, resid, n, k_full, XtX_inv)
+            var_slope = _robust_vce(X_tilde_active, resid, n, k_active, XtX_inv, df_resid=df_resid)
+            # HC1 constant SE via sandwich
+            se_cons = _robust_cons_se(X_tilde_active, resid, n, k_active, XtX_inv, x_means, df_resid=df_resid)
         elif vce == "cluster":
             if cluster is None:
                 raise ValueError("cluster requires cluster variable names")
-            var_beta = _cluster_vce(
-                X_tilde_full, resid, n, k_full, XtX_inv,
-                df_clean, mask, cluster
+            var_slope = _cluster_vce(
+                X_tilde_active, resid, n, k_active, XtX_inv,
+                df_clean, mask, cluster, df_resid=df_resid_vce
+            )
+            se_cons = _cluster_cons_se(
+                X_tilde_active, resid, n, k_active, XtX_inv,
+                x_means, df_clean, mask, cluster, df_resid=df_resid_vce
             )
         else:
             raise ValueError(f"Unknown vce type: {vce}")
 
-        std_err = np.sqrt(np.diag(np.abs(var_beta)))
+        std_err_slope = np.sqrt(np.diag(np.abs(var_slope)))
+        # Build full std_err: active + omitted (0) + constant
+        std_err = np.zeros(k + 1)
+        for j_pos, j_orig in enumerate(active_idx):
+            std_err[j_orig] = std_err_slope[j_pos]
+        std_err[k] = se_cons
+
         t_stat = beta / std_err
-        p_value = np.array([t_pval(t, df_resid) for t in t_stat])
+        # Avoid 0/0 for omitted vars
+        t_stat = np.where(std_err > 0, t_stat, 0.0)
+        p_value = np.array([t_pval(t, df_r_test) for t in t_stat])
 
         # R-squared
-        # Total SS: on demeaned y (within R2)
         SST_within = float(y_tilde @ y_tilde)
         SSE_within = SST_within - SSR
         r2_within = 1 - SSR / SST_within if SST_within > 0 else 0.0
 
-        # Full R-squared
-        y_mean = float(np.mean(y_vec))
         SST = float((y_vec - y_mean) @ (y_vec - y_mean))
         SSE = SST - SSR
         r_squared = 1 - SSR / SST if SST > 0 else 0.0
@@ -127,23 +171,33 @@ class RegHDFE(BaseModel):
         r2_a_within = 1 - (1 - r2_within) * (n - 1) / df_resid if df_resid > 0 else 0.0
 
         # F stat
-        f_stat = (SSE_within / df_model) / (SSR / df_resid) if df_model > 0 and df_resid > 0 else 0.0
-        f_pval_val = f_pval(f_stat, df_model, df_resid) if df_model > 0 else 0.0
+        if vce == "unadjusted":
+            f_stat = (SSE_within / df_model) / (SSR / df_resid) if df_model > 0 and df_resid > 0 else 0.0
+            f_pval_val = f_pval(f_stat, df_model, df_resid) if df_model > 0 else 0.0
+        else:
+            # Wald F: (1/q) * beta_slope' V^(-1) beta_slope
+            if df_model > 0:
+                V_slope_inv = mat_inv(var_slope)
+                f_stat = float(beta_slope @ V_slope_inv @ beta_slope) / df_model
+                f_pval_val = f_pval(f_stat, df_model, df_r_test)
+            else:
+                f_stat = 0.0
+                f_pval_val = 0.0
 
-        # Log-likelihood
+        # Log-likelihood (Stata uses SSR/N, not SSR/df_r)
         mse = SSR / df_resid
         root_mse = np.sqrt(mse)
-        ll = -0.5 * n * (np.log(2 * np.pi) + np.log(mse) + 1)
+        ll = -0.5 * n * (1 + np.log(2 * np.pi) + np.log(SSR / n))
 
         from tabra.results.reghdfe_result import RegHDFEResult
         return RegHDFEResult(
             coef=beta, std_err=std_err, t_stat=t_stat, p_value=p_value,
             r_squared=r_squared, r_squared_adj=r_squared_adj,
             f_stat=f_stat, f_pval=f_pval_val,
-            resid=resid, fitted=X_tilde_full @ beta,
+            resid=resid, fitted=X_active @ beta_slope + b_cons,
             n_obs=n, k_vars=k_full, var_names=var_names,
             SSR=SSR, SSE=SSE, SST=SST,
-            df_model=df_model, df_resid=df_resid,
+            df_model=df_model, df_resid=df_r_test,
             mse=mse, root_mse=root_mse,
             y_name=y,
             r2_within=r2_within, r2_a_within=r2_a_within,
@@ -243,43 +297,31 @@ def _map_partial_out(y_vec, X, fe_arrays, tolerance=1e-8, max_iter=10000):
     return y_work, X_work
 
 
-def _compute_df_a(fe_arrays, cluster, vce):
+def _compute_df_a(fe_arrays, cluster=None, vce=None, fe_names=None):
     """Compute degrees of freedom absorbed by fixed effects.
 
-    For single FE: K - 1 (one category is base / absorbed by constant).
+    For single FE: K (reghdfe counts all categories).
     For two FE: uses connected components of bipartite graph.
     For >2 FE: uses pairwise approximation.
 
-    If cluster is specified, FEs nested in cluster vars are treated as redundant.
+    Note: cluster nesting does NOT affect df_a for model statistics
+    (R², MSE, etc.). It only affects test df via df_r_test.
     """
     n_fe = len(fe_arrays)
     if n_fe == 0:
         return 0
 
-    # Category counts per FE dimension
     K = [len(np.unique(arr)) for arr in fe_arrays]
 
-    # Check for FE nested in cluster
-    if cluster is not None and vce == "cluster":
-        cluster_cols = cluster if isinstance(cluster, list) else [cluster]
-        # If a FE variable is also a cluster variable, it's nested
-        # We'll handle this via the absorbed_fe_info for display
-        pass
-
     if n_fe == 1:
-        # Single FE: K - 1 (one absorbed by intercept)
-        return K[0] - 1
+        return K[0]
 
     if n_fe == 2:
-        # Two-way: use connected components
         M = _count_connected_components(fe_arrays[0], fe_arrays[1])
-        df_a = (K[0] - 1) + (K[1] - M)
-        return df_a
+        return K[0] + K[1] - M
 
     # Multi-way: pairwise approximation
-    df_a = K[0] - 1  # First FE: K - 1
-    M_prev = 1
-
+    df_a = K[0]
     for j in range(1, n_fe):
         M_max = 1
         for i in range(j):
@@ -287,6 +329,41 @@ def _compute_df_a(fe_arrays, cluster, vce):
             M_max = max(M_max, M_ij)
         df_a += K[j] - M_max
 
+    return df_a
+
+
+def _compute_df_a_nested(fe_arrays, cluster_cols, fe_names):
+    """Compute df_a with cluster nesting: nested FEs contribute 0 to df_a."""
+    n_fe = len(fe_arrays)
+    if n_fe == 0:
+        return 0
+
+    cluster_set = set(cluster_cols if isinstance(cluster_cols, list) else [cluster_cols])
+    nested = [fe_names[i] in cluster_set for i in range(n_fe)]
+    K = [len(np.unique(arr)) for arr in fe_arrays]
+
+    if n_fe == 1:
+        return 0 if nested[0] else K[0]
+
+    if n_fe == 2:
+        M = _count_connected_components(fe_arrays[0], fe_arrays[1])
+        df_a = 0
+        df_a += 0 if nested[0] else K[0]
+        df_a += 0 if nested[1] else K[1] - M
+        return df_a
+
+    df_a = 0
+    df_a += 0 if nested[0] else K[0]
+    for j in range(1, n_fe):
+        if nested[j]:
+            continue
+        M_max = 1
+        for i in range(j):
+            if nested[i]:
+                continue
+            M_ij = _count_connected_components(fe_arrays[i], fe_arrays[j])
+            M_max = max(M_max, M_ij)
+        df_a += K[j] - M_max
     return df_a
 
 
@@ -341,18 +418,78 @@ def _count_connected_components(fe1, fe2):
     return n_components
 
 
-def _robust_vce(X, resid, n, k, XtX_inv):
-    """HC1 robust variance-covariance estimator."""
-    # Sandwich: (X'X)^-1 X' diag(e^2) X (X'X)^-1 * N/(N-k)
+def _robust_vce(X, resid, n, k, XtX_inv, df_resid=None):
+    """HC1 robust variance-covariance estimator.
+
+    Args:
+        X: Demeaned design matrix (no constant column).
+        resid: Residuals from demeaned OLS.
+        n: Number of observations.
+        k: Number of slope parameters.
+        XtX_inv: Inverse of X'X.
+        df_resid: Residual degrees of freedom. If provided, uses N/df_resid
+            as the HC1 correction (reghdfe convention). Otherwise uses N/(N-k).
+    """
     e2 = resid ** 2
-    # Meat: X' diag(e^2) X
     meat = (X.T * e2) @ X
-    # HC1 adjustment
-    adj = n / (n - k)
+    adj = n / df_resid if df_resid is not None else n / (n - k)
     return adj * XtX_inv @ meat @ XtX_inv
 
 
-def _cluster_vce(X, resid, n, k, XtX_inv, df_clean, mask, cluster_vars):
+def _robust_cons_se(X, resid, n, k, XtX_inv, x_means, df_resid=None):
+    """HC1 robust SE for the recovered constant term."""
+    e2 = resid ** 2
+    meat = (X.T * e2) @ X
+    adj = n / df_resid if df_resid is not None else n / (n - k)
+    s1 = X.T @ e2
+    sum_e2 = float(np.sum(e2))
+    var_cons = adj * (sum_e2 / (n * n)
+                      - 2.0 * x_means @ XtX_inv @ s1 / n
+                      + x_means @ XtX_inv @ meat @ XtX_inv @ x_means)
+    return np.sqrt(max(var_cons, 0.0))
+
+
+def _cluster_cons_se(X, resid, n, k, XtX_inv, x_means, df_clean, mask, cluster_vars, df_resid=None):
+    """Cluster-robust SE for the recovered constant term."""
+    cluster_cols = cluster_vars if isinstance(cluster_vars, list) else [cluster_vars]
+    retained_idx = np.where(mask)[0]
+    cluster_arrays = []
+    for col in cluster_cols:
+        arr = df_clean[col].values[retained_idx]
+        if arr.dtype.kind not in ('i', 'u'):
+            arr = pd_factorize(arr)
+        cluster_arrays.append(arr)
+
+    if len(cluster_cols) == 1:
+        clust_arr = cluster_arrays[0]
+        unique_clusts = np.unique(clust_arr)
+        meat_slope = np.zeros((k, k))
+        meat_aug11 = 0.0  # sum_g (sum e_g)^2
+        meat_aug1k = np.zeros(k)  # sum_g (sum e_g) * (X_g'e_g)
+        for c in unique_clusts:
+            idx = clust_arr == c
+            Xc = X[idx]
+            ec = resid[idx]
+            g = Xc.T @ ec  # k-vector
+            se = float(np.sum(ec))
+            meat_slope += np.outer(g, g)
+            meat_aug11 += se * se
+            meat_aug1k += se * g
+        N_g = len(unique_clusts)
+        adj = (N_g / (N_g - 1)) * ((n - 1) / df_resid) if df_resid is not None else (N_g / (N_g - 1)) * ((n - 1) / (n - k))
+        var_cons = adj * (meat_aug11 / (n * n)
+                          - 2.0 * x_means @ XtX_inv @ meat_aug1k / n
+                          + x_means @ XtX_inv @ meat_slope @ XtX_inv @ x_means)
+        return np.sqrt(max(var_cons, 0.0))
+    else:
+        # Multi-way: use the slope VCE and approximate
+        var_slope = _cluster_vce(X, resid, n, k, XtX_inv, df_clean, mask, cluster_vars, df_resid=df_resid)
+        sigma2 = float(resid @ resid) / df_resid if df_resid is not None else float(resid @ resid) / (n - k - 1)
+        var_cons = sigma2 / n + x_means @ var_slope @ x_means
+        return np.sqrt(max(var_cons, 0.0))
+
+
+def _cluster_vce(X, resid, n, k, XtX_inv, df_clean, mask, cluster_vars, df_resid=None):
     """Cluster-robust variance-covariance estimator (Cameron-Gelbach-Miller)."""
     cluster_cols = cluster_vars if isinstance(cluster_vars, list) else [cluster_vars]
 
@@ -375,24 +512,19 @@ def _cluster_vce(X, resid, n, k, XtX_inv, df_clean, mask, cluster_vars):
             Xc = X[idx]
             ec = resid[idx]
             meat += Xc.T @ np.outer(ec, ec) @ Xc
-        # Small-sample correction: N_g/(N_g-1) * (N-1)/(N-k)
         N_g = len(unique_clusts)
-        adj = (N_g / (N_g - 1)) * ((n - 1) / (n - k))
+        adj = (N_g / (N_g - 1)) * ((n - 1) / df_resid) if df_resid is not None else (N_g / (N_g - 1)) * ((n - 1) / (n - k))
         return adj * XtX_inv @ meat @ XtX_inv
 
     else:
         # Multi-way clustering (Cameron, Gelbach, Miller 2011)
-        # V = V_12 + V_13 + V_23 - V_1 - V_2 - V_3 + V_0 (for 3-way)
-        # General formula using inclusion-exclusion
         from itertools import combinations
 
         n_clust = len(cluster_cols)
         V_total = np.zeros((k, k))
 
         for r in range(1, n_clust + 1):
-            # Intersect clusters for each combination of r cluster vars
             for combo in combinations(range(n_clust), r):
-                # Create intersection key
                 intersect_arr = _intersect_clusters(
                     [cluster_arrays[i] for i in combo]
                 )
@@ -405,12 +537,10 @@ def _cluster_vce(X, resid, n, k, XtX_inv, df_clean, mask, cluster_vars):
                     meat += Xc.T @ np.outer(ec, ec) @ Xc
                 N_g = len(unique_clusts)
                 if N_g > 1:
-                    adj = (N_g / (N_g - 1)) * ((n - 1) / (n - k))
+                    adj = (N_g / (N_g - 1)) * ((n - 1) / df_resid) if df_resid is not None else (N_g / (N_g - 1)) * ((n - 1) / (n - k))
                 else:
                     adj = 1.0
                 V_combo = adj * XtX_inv @ meat @ XtX_inv
-
-                # Inclusion-exclusion sign
                 sign = (-1) ** (n_clust - r)
                 V_total += sign * V_combo
 
@@ -441,21 +571,29 @@ def _build_absorbed_fe_info(fe_arrays, fe_names, cluster, vce):
     if cluster is not None and vce == "cluster":
         cluster_cols = set(cluster if isinstance(cluster, list) else [cluster])
 
+    n_fe = len(fe_arrays)
     for i, (arr, name) in enumerate(zip(fe_arrays, fe_names)):
         n_cats = len(np.unique(arr))
         is_nested = name in cluster_cols
-        redundant = n_cats if is_nested else 0
-        num_coefs = n_cats - redundant if i == 0 else n_cats - 1
 
-        # Adjust for first FE: one more redundant (intercept)
-        if i == 0 and not is_nested:
-            num_coefs = n_cats - 1
+        if is_nested:
+            redundant = n_cats
+            num_coefs = 0
+        elif i == 0:
+            # First FE: no redundant (reghdfe counts all K categories)
+            redundant = 0
+            num_coefs = n_cats
+        else:
+            # Subsequent FE: connected components with previous
+            M = _count_connected_components(fe_arrays[0], arr)
+            redundant = M
+            num_coefs = n_cats - M
 
         info.append({
             "name": name,
             "categories": n_cats,
-            "redundant": redundant if is_nested else (1 if i == 0 else 0),
-            "num_coefs": n_cats - (redundant if is_nested else (1 if i == 0 else 0)),
+            "redundant": redundant,
+            "num_coefs": num_coefs,
             "nested": is_nested,
         })
     return info
