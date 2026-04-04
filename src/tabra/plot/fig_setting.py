@@ -27,3 +27,4 @@ class PlotKind(Enum):
     pie = "pie"
     lfit = "lfit"
     lfitci = "lfitci"
+    coefplot = "coefplot"
