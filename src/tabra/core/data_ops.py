@@ -115,6 +115,11 @@ class DataOps:
             return vars_input.split()
         return list(vars_input)
 
+    def _resolve_vars(self, vars_input) -> list[str]:
+        """Resolve vars: exact name first, fallback to regex match."""
+        from tabra.utils import resolve_var
+        return resolve_var(vars_input, self._tabra._df.columns.tolist())
+
     _EGEN_AGG = {
         "mean": "mean",
         "sum": "sum",
@@ -944,7 +949,7 @@ class DataOps:
         """
         df = self._tabra._df
         if vars is not None:
-            vars_list = self._parse_vars(vars)
+            vars_list = self._resolve_vars(vars)
             df = df[vars_list]
         print(df.head(lines).to_string())
         return self
@@ -967,3 +972,100 @@ class DataOps:
         """
         import re
         return [c for c in self._tabra._df.columns if re.search(pattern, c)]
+
+    def describe(self, vars: list[str] | str = None):
+        """Print variable overview (Stata describe).
+
+        Shows variable name, dtype, non-missing count, and missing count.
+
+        Args:
+            vars (str or list, optional): Variable name(s) to describe.
+                Supports space-separated names or regex pattern.
+                None describes all columns. Default None.
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> dta.data.describe()
+            >>> dta.data.describe("price mpg rep78")
+            >>> dta.data.describe("^r")
+        """
+        import re
+        df = self._tabra._df
+        if vars is not None:
+            vars_list = self._resolve_vars(vars)
+            df = df[vars_list]
+
+        rows = []
+        for col in df.columns:
+            dtype = str(df[col].dtype)
+            non_missing = int(df[col].notna().sum())
+            missing = int(df[col].isna().sum())
+            rows.append({
+                "variable": col,
+                "dtype": dtype,
+                "non_missing": non_missing,
+                "missing": missing,
+            })
+        result = pd.DataFrame(rows)
+        n_obs = len(self._tabra._df)
+        print(f"Observations: {n_obs}")
+        print(f"Variables:    {len(df.columns)}")
+        print(result.to_string(index=False))
+        return self
+
+    def tabulate(
+        self,
+        var: str,
+        by: str = None,
+        *,
+        sort: bool = False,
+    ):
+        """Frequency table for one variable, or crosstab for two (Stata tabulate).
+
+        Args:
+            var (str): Variable to tabulate.
+            by (str, optional): Second variable for crosstab. Default None.
+            sort (bool): Sort by frequency descending. Default False.
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> dta.data.tabulate("foreign")
+            >>> dta.data.tabulate("rep78", sort=True)
+            >>> dta.data.tabulate("foreign", by="rep78")
+        """
+        df = self._tabra._df
+        if var not in df.columns:
+            raise KeyError(f"Variable '{var}' not found in DataFrame")
+
+        if by is None:
+            # --- one-way tabulation ---
+            counts = df[var].value_counts(dropna=False, sort=sort)
+            total = int(counts.sum())
+            rows = []
+            cum = 0
+            for val, freq in counts.items():
+                pct = freq / total * 100
+                cum += pct
+                label = str(val) if pd.notna(val) else "."
+                rows.append({
+                    var: label,
+                    "Freq.": freq,
+                    "Percent": round(pct, 2),
+                    "Cum.": round(cum, 2),
+                })
+            result = pd.DataFrame(rows)
+            print(result.to_string(index=False))
+            print(f"{'─' * 40}")
+            print(f"{'Total':>{len(var)}} | {total:>5}   100.00")
+        else:
+            # --- two-way crosstab ---
+            if by not in df.columns:
+                raise KeyError(f"Variable '{by}' not found in DataFrame")
+            ct = pd.crosstab(df[var], df[by], margins=True, dropna=False)
+            print(ct.to_string())
+
+        return self
