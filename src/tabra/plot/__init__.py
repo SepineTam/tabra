@@ -12,6 +12,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from tabra.plot.fig_setting import PlotKind
 
@@ -629,6 +630,163 @@ class PlotOps:
             axes_flat[idx].set_visible(False)
 
         fig.tight_layout()
+        return TabraFigure(fig, tabra=self._tabra)
+
+    def heatmap(self, data=None, *, var_names=None,
+                annot=True, fmt=".2f", cmap="RdBu_r",
+                vmin=-1.0, vmax=1.0,
+                title=None, template=None, fig_setting=None):
+        """Draw a heatmap from a correlation matrix or result.
+
+        Args:
+            data: CorrResult, DataFrame, ndarray, or None (uses latest result).
+            var_names (list[str]): Variable labels for ndarray input.
+            annot (bool): Show values in cells. Default True.
+            fmt (str): Number format for annotations. Default ".2f".
+            cmap (str): Colormap. Default "RdBu_r" (blue-white-red).
+            vmin (float): Color scale minimum. Default -1.0.
+            vmax (float): Color scale maximum. Default 1.0.
+            title (str): Plot title.
+            template (PlotTemplateBase): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+        """
+        from tabra.core.errors import NoResultError
+
+        if data is None:
+            data = self._tabra._result
+            if data is None:
+                raise NoResultError(
+                    "No result to plot. Run tab.data.corr() first."
+                )
+
+        # Extract matrix and labels from various input types
+        if hasattr(data, "matrix") and hasattr(data, "var_names"):
+            matrix = np.asarray(data.matrix)
+            labels = list(data.var_names)
+            if hasattr(data, "accuracy"):
+                # ConfusionMatrixResult — auto-switch defaults
+                cmap = cmap if cmap != "RdBu_r" else "Blues"
+                fmt = "d" if fmt == ".2f" else fmt
+                vmin = vmin if vmin != -1.0 else 0
+                vmax = vmax if vmax != 1.0 else int(matrix.max())
+                if title is None:
+                    title = "Confusion Matrix"
+            else:
+                if title is None:
+                    title = f"Correlation ({getattr(data, 'method', 'pearson')})"
+        elif isinstance(data, pd.DataFrame):
+            matrix = data.values
+            labels = list(data.columns)
+        elif isinstance(data, np.ndarray):
+            matrix = data
+            labels = var_names or [f"V{i+1}" for i in range(matrix.shape[0])]
+        else:
+            raise TypeError(
+                f"Expected CorrResult, DataFrame, or ndarray, "
+                f"got {type(data).__name__}"
+            )
+
+        n = matrix.shape[0]
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig_size = max(template.fig_width, 2.0 + 0.6 * n)
+        fig, ax = plt.subplots(
+            figsize=(fig_size, fig_size),
+            dpi=template.dpi,
+        )
+
+        im = ax.imshow(matrix, cmap=cmap, vmin=vmin, vmax=vmax,
+                        aspect="equal")
+
+        # Tick labels
+        ax.set_xticks(range(n))
+        ax.set_yticks(range(n))
+        ax.set_xticklabels(labels, rotation=45, ha="right",
+                           fontsize=template.tick_size)
+        ax.set_yticklabels(labels, fontsize=template.tick_size)
+
+        # Annotations
+        if annot:
+            for i in range(n):
+                for j in range(n):
+                    val = matrix[i, j]
+                    text_color = "white" if abs(val) > 0.6 else "black"
+                    ax.text(j, i, format(val, fmt),
+                            ha="center", va="center",
+                            color=text_color, fontsize=template.tick_size)
+
+        if title is not None:
+            ax.set_title(title, fontsize=template.title_size)
+
+        # Colorbar
+        fig.colorbar(im, ax=ax, shrink=0.8)
+
+        if not template.spine_top:
+            ax.spines["top"].set_visible(False)
+        if not template.spine_right:
+            ax.spines["right"].set_visible(False)
+
+        fig.tight_layout()
+        return TabraFigure(fig, tabra=self._tabra)
+
+    def rvfplot(self, result=None, title=None,
+                xtitle=None, ytitle=None,
+                template=None, fig_setting=None):
+        """Draw a residual-vs-fitted plot (like Stata rvfplot).
+
+        Plots residuals on the y-axis against fitted values on the x-axis,
+        with a horizontal reference line at 0.
+
+        Args:
+            result: Result object with ``resid`` and ``fitted`` properties,
+                or None (uses latest result).
+            title (str): Plot title.
+            xtitle (str): X-axis label. Defaults to "Fitted values".
+            ytitle (str): Y-axis label. Defaults to "Residuals".
+            template (PlotTemplateBase): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+
+        Raises:
+            NoResultError: If no result is stored.
+            ResultTypeError: If the result lacks ``resid`` or ``fitted``.
+        """
+        from tabra.core.errors import NoResultError, ResultTypeError
+
+        if result is None:
+            result = self._tabra._result
+            if result is None:
+                raise NoResultError(
+                    "No result to plot. Run a regression first."
+                )
+
+        if not hasattr(result, "resid") or not hasattr(result, "fitted"):
+            raise ResultTypeError(
+                "Result does not have resid/fitted. "
+                "rvfplot requires a regression result (OLS, RegHDFE, etc.)."
+            )
+
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig, ax = self._make_fig(template)
+        resid = np.asarray(result.resid)
+        fitted = np.asarray(result.fitted)
+
+        ax.scatter(fitted, resid, s=template.marker_size,
+                   c=template.primary_color, alpha=0.7)
+        ax.axhline(y=0, color="grey", linewidth=0.8, linestyle="--")
+        ax.set_xlabel(xtitle if xtitle is not None else "Fitted values")
+        ax.set_ylabel(ytitle if ytitle is not None else "Residuals")
+        if title is not None:
+            ax.set_title(title)
+        self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)
 
 # ---- Module-level global settings ----

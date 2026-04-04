@@ -18,7 +18,8 @@ class BinaryChoiceResult(BaseResult):
                  n_obs, k_vars, df_m, var_names,
                  y_name="", model_name="Binary Choice",
                  converged=True, n_iter=0,
-                 vce_type="OIM"):
+                 vce_type="OIM",
+                 y_true=None, y_pred=None):
         super().__init__()
         self._coef = coef
         self._std_err = std_err
@@ -38,6 +39,8 @@ class BinaryChoiceResult(BaseResult):
         self._converged = converged
         self._n_iter = n_iter
         self._vce_type = vce_type
+        self._y_true = y_true
+        self._y_pred = y_pred
 
     @property
     def coef(self):
@@ -150,6 +153,24 @@ class BinaryChoiceResult(BaseResult):
     def save(self, path="binary_choice_result.txt"):
         with open(path, "w") as f:
             f.write(self.summary())
+
+    def confusion_matrix(self):
+        from tabra.results.confusion_matrix_result import ConfusionMatrixResult
+        if self._y_true is None:
+            raise ValueError("No prediction data stored.")
+        labels = sorted(set(self._y_true.astype(int)) | set(self._y_pred.astype(int)))
+        k = len(labels)
+        label_to_idx = {l: i for i, l in enumerate(labels)}
+        matrix = np.zeros((k, k), dtype=int)
+        for t, p in zip(self._y_true, self._y_pred):
+            matrix[label_to_idx[int(t)], label_to_idx[int(p)]] += 1
+        accuracy = float(np.sum(self._y_true == self._y_pred) / len(self._y_true))
+        return ConfusionMatrixResult(
+            matrix=matrix,
+            labels=[str(l) for l in labels],
+            accuracy=accuracy,
+            n_obs=len(self._y_true),
+        )
 
     def __repr__(self):
         return self.summary()

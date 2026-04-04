@@ -109,6 +109,8 @@ class BinaryChoiceModel(BaseModel):
         df_m = k - 1 if is_con else k
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
 
+        y_pred = (p >= 0.5).astype(int)
+
         return BinaryChoiceResult(
             coef=beta,
             std_err=std_err,
@@ -128,6 +130,8 @@ class BinaryChoiceModel(BaseModel):
             converged=converged,
             n_iter=n_iter,
             vce_type="OIM",
+            y_true=y_vec,
+            y_pred=y_pred,
         )
 
     def _fit_null_model(self, y):
