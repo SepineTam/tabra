@@ -36,7 +36,7 @@ class OLS(BaseModel):
         X = df[x].values.astype(float)
         var_names = list(x)
         if is_con:
-            X = np.column_stack([np.ones(X.shape[0]), X])
+            X = np.column_stack([X, np.ones(X.shape[0])])
             var_names = var_names + ["_cons"]
         n, k = X.shape
 
@@ -55,12 +55,19 @@ class OLS(BaseModel):
         p_value = np.array([t_pval(t, n - k) for t in t_stat])
 
         SSR = float(mat_mul(mat_transpose(resid), resid)[0, 0])
-        y_mean = float(np.mean(y_vec))
-        SST = float(mat_mul(mat_transpose(y_vec - y_mean), y_vec - y_mean)[0, 0])
+        if is_con:
+            y_mean = float(np.mean(y_vec))
+            SST = float(mat_mul(mat_transpose(y_vec - y_mean), y_vec - y_mean)[0, 0])
+        else:
+            y_mean = 0.0
+            SST = float(mat_mul(mat_transpose(y_vec), y_vec)[0, 0])
         SSE = SST - SSR
 
         r_squared = 1 - SSR / SST
-        r_squared_adj = 1 - (1 - r_squared) * (n - 1) / (n - k)
+        if is_con:
+            r_squared_adj = 1 - (1 - r_squared) * (n - 1) / (n - k)
+        else:
+            r_squared_adj = 1 - (1 - r_squared) * n / (n - k)
 
         df_model = k - 1 if is_con else k
         df_resid = n - k

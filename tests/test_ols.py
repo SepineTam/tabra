@@ -22,8 +22,8 @@ def ols_data():
     noise = np.random.randn(n) * 0.5
     y = 2 + 3 * x1 + 1.5 * x2 + noise
 
-    # numpy oracle (with constant)
-    X = np.column_stack([np.ones(n), x1, x2])
+    # numpy oracle (with constant, _cons last to match OLS)
+    X = np.column_stack([x1, x2, np.ones(n)])
     beta_np = np.linalg.lstsq(X, y, rcond=None)[0]
     resid_np = y - X @ beta_np
     sigma2 = resid_np @ resid_np / (n - 3)
@@ -50,18 +50,18 @@ def ols_data_no_constant():
     noise = np.random.randn(n) * 0.5
     y = 3 * x1 + 1.5 * x2 + noise  # 无常数项
 
-    # numpy oracle (without constant)
+    # numpy oracle (without constant, uncentered R² as Stata)
     X = np.column_stack([x1, x2])
     beta_np = np.linalg.lstsq(X, y, rcond=None)[0]
     resid_np = y - X @ beta_np
     sigma2 = resid_np @ resid_np / (n - 2)
     XtX_inv = np.linalg.inv(X.T @ X)
     se_np = np.sqrt(sigma2 * np.diag(XtX_inv))
-    SST = np.sum((y - y.mean()) ** 2)
+    SST = np.sum(y ** 2)  # uncentered
     SSR = resid_np @ resid_np
     SSE = SST - SSR
     r2 = 1 - SSR / SST
-    r2_adj = 1 - (1 - r2) * (n - 1) / (n - 2)
+    r2_adj = 1 - (1 - r2) * n / (n - 2)  # Stata noconstant formula
     f_stat = (SSE / 2) / (SSR / (n - 2))
 
     df = pd.DataFrame({"y": y, "x1": x1, "x2": x2})
