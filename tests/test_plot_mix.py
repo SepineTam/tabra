@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from tabra import load_data
-from tabra.plot.fig_setting import PlotKind, AER
+from tabra.plot.fig_setting import PlotKind
+from tabra.plot.templates import AER
 from tabra.plot import TabraFigure
 
 
@@ -26,7 +27,7 @@ class TestPlotKind:
         members = [m.name for m in PlotKind]
         assert "scatter" in members
         assert "line" in members
-        assert len(members) == 6
+        assert len(members) == 9
 
 
 class TestMix:

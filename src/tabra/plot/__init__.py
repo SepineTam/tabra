@@ -8,6 +8,7 @@
 # @File   : __init__.py
 
 import os
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,20 +23,64 @@ class TabraFigure:
         self._fig = fig
         self._tabra = tabra
 
-    def save(self, filename: str, dpi: int = 300, **kwargs):
-        """Save the figure to a file.
+    def save(self, filename: str, dpi: int = 300,
+             formats: list = None, **kwargs):
+        """Save the figure to one or more files.
 
         Args:
-            filename (str): Output file path.
+            filename (str): Output file path. If no extension and formats
+                is None, defaults to ``.png``.
             dpi (int): Resolution in dots per inch. Default 300.
+            formats (list): List of format extensions, e.g. ``["png", "pdf"]``.
+                If filename has no extension, replaces the implicit default.
+                If filename has an extension and formats is given, saves as
+                ``name.ext.fmt`` for each format.
             **kwargs: Additional keyword arguments passed to ``savefig``.
 
         Returns:
             TabraFigure: Returns self for method chaining.
         """
-        os.makedirs(os.path.dirname(filename) or ".", exist_ok=True)
-        self._fig.savefig(filename, dpi=dpi, bbox_inches="tight", **kwargs)
+        paths = self._resolve_paths(filename, formats)
+        for p in paths:
+            os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+            self._fig.savefig(p, dpi=dpi, bbox_inches="tight", **kwargs)
         return self
+
+    def _resolve_paths(self, filename, formats):
+        """Resolve filename into one or more output paths."""
+        # Resolve save_base: instance config > global > None
+        base = None
+        if self._tabra is not None:
+            base = getattr(self._tabra._config, "_figure_save_base", None)
+        if base is None:
+            from tabra.core.config import _global_figure_save_base
+            base = _global_figure_save_base
+
+        p = Path(filename)
+        is_abs = p.is_absolute()
+        if base and not is_abs:
+            p = Path(base) / p
+
+        suffix = p.suffix  # e.g. ".png" or ""
+
+        if formats is None:
+            # No formats specified
+            if suffix == "":
+                # No extension → default to .png
+                return [str(p.with_suffix(".png"))]
+            else:
+                return [str(p)]
+        else:
+            # Formats specified
+            if suffix == "":
+                # No extension → generate one file per format
+                return [str(p.with_suffix(f".{fmt}")) for fmt in formats]
+            else:
+                # Has extension → name.ext.fmt for each format
+                return [str(p).rstrip(suffix) + suffix + f".{fmt}"
+                        if fmt != suffix.lstrip(".")
+                        else str(p)
+                        for fmt in formats]
 
     def show(self):
         """Display the figure.
@@ -308,6 +353,75 @@ class PlotOps:
         self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)
 
+    def box(self, var, by: str = None, title: str = None,
+               xtitle: str = None, ytitle: str = None,
+               template=None, fig_setting=None):
+        """Draw a box plot.
+
+        Args:
+            var (str | list[str]): Variable name(s) to plot.
+            by (str): Grouping variable. If None, draws without grouping.
+            title (str): Plot title.
+            xtitle (str): X-axis label.
+            ytitle (str): Y-axis label.
+            template (PlotTemplate): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+        """
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        fig, ax = self._make_fig(template)
+        colors = list(template.color_cycle)
+
+        vars_list = [var] if isinstance(var, str) else var
+
+        if by is None:
+            # No grouping: side by side boxes for each var
+            data = [self._df[v].dropna().values for v in vars_list]
+            bp = ax.boxplot(data, labels=vars_list, patch_artist=True)
+            for patch, color in zip(bp['boxes'], colors[:len(data)]):
+                patch.set_facecolor(color)
+        else:
+            # Grouped by 'by'
+            groups = sorted(self._df[by].dropna().unique())
+            if len(vars_list) == 1:
+                all_data = [self._df[self._df[by] == g][vars_list[0]].dropna().values
+                              for g in groups]
+                bp = ax.boxplot(all_data,
+                                labels=[str(g) for g in groups],
+                                patch_artist=True)
+                for patch, color in zip(bp['boxes'], colors[:len(groups)]):
+                    patch.set_facecolor(color)
+            else:
+                # Multiple vars + grouping: nested
+                all_data = []
+                tick_labels = []
+                positions = []
+                pos = 1
+                for g in groups:
+                    for v in vars_list:
+                        subset = self._df[self._df[by] == g]
+                        all_data.append(subset[v].dropna().values)
+                        tick_labels.append(str(g))
+                        positions.append(pos)
+                        pos += 1
+                    pos += 0.5
+                bp = ax.boxplot(all_data, labels=tick_labels,
+                                positions=positions, patch_artist=True,
+                                widths=0.6)
+                for i, patch in enumerate(bp['boxes']):
+                    patch.set_facecolor(colors[i % len(vars_list)])
+
+        ax.set_xlabel(xtitle if xtitle is not None else (by if by is not None else ", ".join(vars_list)))
+        ax.set_ylabel(ytitle if ytitle is not None else ", ".join(vars_list))
+        if title is not None:
+            ax.set_title(title)
+        self._apply_template(template, ax)
+        return TabraFigure(fig, tabra=self._tabra)
+
     def mix(self, layers: list, title: str = None,
             xtitle: str = None, ytitle: str = None,
             template=None, fig_setting=None):
@@ -410,3 +524,41 @@ class PlotOps:
             ax.set_ylabel(ytitle)
         self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)
+
+# ---- Module-level global settings ----
+
+_global_plot_template = None
+_global_figure_save_base = None
+
+
+def set_plot_template(template):
+    """Set the global default plot template.
+
+    Args:
+        template (PlotTemplate): A PlotTemplate instance, e.g. ``AER``, ``QJE``.
+
+    Example:
+        >>> from tabra.plot.template import AER
+        >>> from tabra.plot import set_plot_template
+        >>> set_plot_template(AER)
+    """
+    global _global_plot_template
+    from tabra.plot.templates import PlotTemplateBase
+    if not isinstance(template, PlotTemplateBase):
+        raise TypeError("template must be a PlotTemplateBase instance")
+    _global_plot_template = template
+    template.apply()
+
+
+def set_save_base(base_dir):
+    """Set the global base directory for relative figure save paths.
+
+    Args:
+        base_dir (str or Path): Base directory path.
+
+    Example:
+        >>> from tabra.plot import set_save_base
+        >>> set_save_base("tmp/figs")
+    """
+    global _global_figure_save_base
+    _global_figure_save_base = str(base_dir)
