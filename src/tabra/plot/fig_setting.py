@@ -29,3 +29,5 @@ class PlotKind(Enum):
     lfitci = "lfitci"
     coefplot = "coefplot"
     kdensity = "kdensity"
+    heatmap = "heatmap"
+    rvfplot = "rvfplot"

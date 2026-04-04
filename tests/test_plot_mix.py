@@ -27,7 +27,7 @@ class TestPlotKind:
         members = [m.name for m in PlotKind]
         assert "scatter" in members
         assert "line" in members
-        assert len(members) == 11
+        assert len(members) == 13
 
 
 class TestMix:
