@@ -25,6 +25,10 @@ from tabra.models.estimate.qreg import QuantileRegression
 from tabra.models.estimate.ordered_choice import OrderedProbitModel, OrderedLogitModel
 from tabra.models.estimate.glm import GLMModel
 from tabra.models.estimate.mlogit import MultinomialLogitModel
+from tabra.models.estimate.iv import IVModel
+from tabra.models.estimate.ivprobit import IVProbitModel
+from tabra.models.estimate.ivtobit import IVTobitModel
+from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
 
 
 class TabraData:
@@ -417,6 +421,183 @@ class TabraData:
         model = MultinomialLogitModel()
         result = model.fit(self._df, y, x, base_outcome=base_outcome,
                            is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def ivreg(self, y: str, exog: list[str], endog: list[str],
+              iv: list[str], estimator: str = "2sls",
+              vce: str = "unadjusted", is_con: bool = True):
+        """Fit an instrumental-variables regression model.
+
+        Args:
+            y (str): Dependent variable name.
+            exog (list[str]): Exogenous explanatory variable names.
+            endog (list[str]): Endogenous variable names.
+            iv (list[str]): Instrument variable names.
+            estimator (str): One of "2sls", "gmm", "liml". Default "2sls".
+            vce (str): "unadjusted" or "robust". Default "unadjusted".
+            is_con (bool): Whether to add a constant. Default True.
+
+        Returns:
+            IVResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = dta.ivreg("price", exog=["weight"],
+            ...     endog=["mpg"], iv=["foreign", "headroom"], estimator="2sls")
+        """
+        model = IVModel()
+        result = model.fit(self._df, y, exog=exog, endog=endog,
+                           instruments=iv, estimator=estimator,
+                           vce=vce, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def ivreg2(self, y: str, exog: list[str], endog: list[str],
+               iv: list[str], estimator: str = "2sls",
+               vce: str = "unadjusted", cluster: list[str] = None,
+               is_con: bool = True, fuller_alpha: float = 1.0,
+               kclass_k: float = None):
+        """Fit an enhanced IV regression (ivreg2) with more estimators and diagnostics.
+
+        Args:
+            y (str): Dependent variable name.
+            exog (list[str]): Exogenous explanatory variable names.
+            endog (list[str]): Endogenous variable names.
+            iv (list[str]): Instrument variable names.
+            estimator (str): One of "2sls", "gmm", "liml", "cue", "fuller", "kclass".
+            vce (str): "unadjusted", "robust", or "cluster".
+            cluster (list[str]): Cluster variable names. Required when vce="cluster".
+            is_con (bool): Whether to add a constant. Default True.
+            fuller_alpha (float): Fuller alpha parameter. Default 1.0.
+            kclass_k (float): k-class k value. Required when estimator="kclass".
+
+        Returns:
+            IVResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = dta.ivreg2("price", exog=["weight"],
+            ...     endog=["mpg"], iv=["foreign", "headroom"],
+            ...     estimator="cue")
+        """
+        model = IVModel()
+        result = model.fit(self._df, y, exog=exog, endog=endog,
+                           instruments=iv, estimator=estimator,
+                           vce=vce, is_con=is_con,
+                           fuller_alpha=fuller_alpha,
+                           kclass_k=kclass_k,
+                           cluster=cluster)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def ivprobit(self, y: str, exog: list[str], endog: list[str],
+                 iv: list[str], method: str = "mle",
+                 vce: str = "unadjusted", is_con: bool = True):
+        """Fit an IV probit regression model.
+
+        Args:
+            y (str): Binary dependent variable name (0/1).
+            exog (list[str]): Exogenous explanatory variable names.
+            endog (list[str]): Endogenous variable names.
+            iv (list[str]): Instrument variable names.
+            method (str): "mle" or "twostep". Default "mle".
+            vce (str): "unadjusted" or "robust". Default "unadjusted".
+            is_con (bool): Whether to add a constant. Default True.
+
+        Returns:
+            IVProbitResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = dta.ivprobit("foreign", exog=["weight"],
+            ...     endog=["mpg"], iv=["headroom", "trunk"], method="mle")
+        """
+        model = IVProbitModel()
+        result = model.fit(self._df, y, exog=exog, endog=endog,
+                           instruments=iv, method=method, vce=vce,
+                           is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def ivtobit(self, y: str, exog: list[str], endog: list[str],
+                iv: list[str], ll=None, ul=None,
+                method: str = "mle", vce: str = "unadjusted",
+                is_con: bool = True):
+        """Fit an IV tobit censored regression model.
+
+        Args:
+            y (str): Censored dependent variable name.
+            exog (list[str]): Exogenous explanatory variable names.
+            endog (list[str]): Endogenous variable names.
+            iv (list[str]): Instrument variable names.
+            ll (float): Left-censoring limit. Default None.
+            ul (float): Right-censoring limit. Default None.
+            method (str): "mle" or "twostep". Default "mle".
+            vce (str): "unadjusted" or "robust". Default "unadjusted".
+            is_con (bool): Whether to add a constant. Default True.
+
+        Returns:
+            IVTobitResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> result = dta.ivtobit("price", exog=["weight"],
+            ...     endog=["mpg"], iv=["headroom", "trunk"], ll=0)
+        """
+        model = IVTobitModel()
+        result = model.fit(self._df, y, exog=exog, endog=endog,
+                           instruments=iv, ll=ll, ul=ul,
+                           method=method, vce=vce, is_con=is_con)
+        result.set_style(self._style)
+        self._result = result
+        if self._is_display_result:
+            result.set_display(True)
+        return result
+
+    def ivreghdfe(self, y: str, exog: list[str], endog: list[str],
+                  iv: list[str], absorb: list[str],
+                  estimator: str = "2sls", vce: str = "unadjusted",
+                  cluster: list[str] = None, is_con: bool = True):
+        """Fit an IV regression with high-dimensional fixed effects.
+
+        Args:
+            y (str): Dependent variable name.
+            exog (list[str]): Exogenous explanatory variable names.
+            endog (list[str]): Endogenous variable names.
+            iv (list[str]): Instrument variable names.
+            absorb (list[str]): FE variable names to absorb.
+            estimator (str): "2sls", "gmm", "liml". Default "2sls".
+            vce (str): "unadjusted", "robust", "cluster". Default "unadjusted".
+            cluster (list[str]): Cluster variable names.
+            is_con (bool): Whether to add a constant. Default True.
+
+        Returns:
+            IVResult: Estimation result.
+
+        Example:
+            >>> dta = load_data("nlswork")
+            >>> dta.xeset("idcode", "year")
+            >>> result = dta.ivreghdfe("ln_wage", exog=["age"],
+            ...     endog=["tenure"], iv=["union"], absorb=["idcode"])
+        """
+        model = IVRegHDFEModel()
+        result = model.fit(self._df, y, exog=exog, endog=endog,
+                           instruments=iv, absorb=absorb,
+                           estimator=estimator, vce=vce,
+                           cluster=cluster, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:

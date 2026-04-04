@@ -356,6 +356,444 @@ class DataOps:
         self._tabra._df = df
         return self
 
+    def reshape_long(
+        self,
+        stub: str | list[str],
+        i: str,
+        j: str = "_j",
+    ):
+        """Reshape from wide to long format (Stata reshape long).
+
+        Finds columns matching ``stub_suffix`` (e.g., ``"wage"`` matches
+        ``wage_2020``, ``wage_2021``) and collapses them into long format.
+
+        Args:
+            stub (str or list): Variable name prefix(es) to reshape.
+                Accepts a string, space-separated string, or list.
+            i (str): ID variable that identifies each group.
+            j (str): Name for the new variable holding suffixes. Default "_j".
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> tab.data.reshape_long("wage", i="firm", j="year")
+            >>> tab.data.reshape_long(["wage", "hours"], i="firm")
+        """
+        stubs = self._parse_vars(stub)
+        df = self._tabra._df
+
+        if i not in df.columns:
+            raise KeyError(f"Variable '{i}' not found in DataFrame")
+
+        for s in stubs:
+            matching = [c for c in df.columns if c.startswith(s + "_")]
+            if not matching:
+                raise KeyError(
+                    f"No columns found matching stub '{s}_' in DataFrame"
+                )
+
+        result = pd.wide_to_long(
+            df, stubnames=stubs, i=i, j=j, sep="_", suffix=".*",
+        )
+        result = result.reset_index()
+        result = result.dropna(subset=stubs, how="all")
+        result = result.reset_index(drop=True)
+
+        self._tabra._df = result
+        return self
+
+    def reshape_wide(
+        self,
+        stub: str | list[str],
+        i: str,
+        j: str,
+    ):
+        """Reshape from long to wide format (Stata reshape wide).
+
+        Pivots long-format data so that each value of ``j`` becomes a new
+        column, named ``stub_jvalue``.
+
+        Args:
+            stub (str or list): Variable name(s) to pivot into wide columns.
+                Accepts a string, space-separated string, or list.
+            i (str): ID variable that identifies each group.
+            j (str): Variable whose values become column suffixes.
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> tab.data.reshape_wide("wage", i="firm", j="year")
+            >>> tab.data.reshape_wide(["wage", "hours"], i="firm", j="year")
+        """
+        stubs = self._parse_vars(stub)
+        df = self._tabra._df
+
+        if i not in df.columns:
+            raise KeyError(f"Variable '{i}' not found in DataFrame")
+        if j not in df.columns:
+            raise KeyError(f"Variable '{j}' not found in DataFrame")
+        for s in stubs:
+            if s not in df.columns:
+                raise KeyError(f"Variable '{s}' not found in DataFrame")
+
+        pivoted = df.pivot(index=i, columns=j, values=stubs)
+        pivoted.columns = [f"{col[0]}_{col[1]}" for col in pivoted.columns]
+
+        self._tabra._df = pivoted.reset_index()
+        return self
+
+    _COLLAPSE_STATS = {
+        "mean": "mean",
+        "median": "median",
+        "sum": "sum",
+        "total": "sum",
+        "sd": lambda x: x.std(ddof=1),
+        "min": "min",
+        "max": "max",
+        "count": "count",
+        "first": "first",
+        "last": "last",
+        "iqr": lambda x: x.quantile(0.75) - x.quantile(0.25),
+    }
+
+    def _resolve_collapse_stat(self, stat: str):
+        """Resolve a stat name (including pXX percentiles) to a callable or string."""
+        stat = stat.lower()
+        if stat in self._COLLAPSE_STATS:
+            return self._COLLAPSE_STATS[stat], stat
+        # percentile: p1 .. p99
+        if stat.startswith("p") and stat[1:].isdigit():
+            pct = int(stat[1:])
+            if 1 <= pct <= 99:
+                return lambda x, p=pct: x.quantile(p / 100), stat
+        raise ValueError(
+            f"Unknown stat '{stat}'. Supported: "
+            f"{', '.join(sorted(self._COLLAPSE_STATS.keys()))}, p1-p99"
+        )
+
+    def collapse(
+        self,
+        stat: str = "mean",
+        vars: str | list[str] = None,
+        by: str | list[str] = None,
+    ):
+        """Aggregate data by groups, replacing the dataset with summary stats.
+
+        Mimics Stata's ``collapse`` command. Each group becomes one row.
+
+        Args:
+            stat (str): Statistic to compute. One of "mean", "median", "sum",
+                "total", "sd", "min", "max", "count", "first", "last", "iqr",
+                or "p1"–"p99". Default "mean".
+            vars (str or list): Variables to aggregate. None aggregates all
+                numeric columns.
+            by (str or list): Grouping variable(s). None collapses the entire
+                dataset into one row.
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> tab.data.collapse("mean", vars="wage age", by="industry")
+            >>> tab.data.collapse("median", by=["state", "year"])
+            >>> tab.data.collapse("p25", vars="wage", by="industry")
+        """
+        df = self._tabra._df
+
+        agg_func, _ = self._resolve_collapse_stat(stat)
+
+        # Parse vars
+        if vars is not None:
+            agg_vars = self._parse_vars(vars)
+        else:
+            agg_vars = df.select_dtypes(include="number").columns.tolist()
+
+        # Validate vars exist
+        for v in agg_vars:
+            if v not in df.columns:
+                raise KeyError(f"Variable '{v}' not found in DataFrame")
+
+        # Parse by
+        by_vars = self._parse_vars(by) if by is not None else None
+        if by_vars is not None:
+            for v in by_vars:
+                if v not in df.columns:
+                    raise KeyError(f"Variable '{v}' not found in DataFrame")
+
+        # Build aggregation dict
+        agg_dict = {v: agg_func for v in agg_vars}
+
+        if by_vars is not None:
+            grouped = df.groupby(by_vars)
+            result = grouped.agg(agg_dict)
+        else:
+            result = df.agg(agg_dict).to_frame().T
+
+        result = result.reset_index()
+        # Remove any extra index columns from groupby
+        if by_vars is not None:
+            # Keep only by_vars + agg_vars
+            keep = [c for c in result.columns if c in by_vars or c in agg_vars]
+            result = result[keep]
+
+        self._tabra._df = result
+        return self
+
+    def duplicates(
+        self,
+        cmd: str,
+        vars: str | list[str] = None,
+        gen: str = None,
+    ):
+        """Report, tag, or drop duplicate observations (Stata duplicates).
+
+        Args:
+            cmd (str): Sub-command. One of "report", "examples", "list",
+                "tag", "drop".
+            vars (str or list, optional): Variables to check for duplicates.
+                None checks all columns. Accepts string, space-separated
+                string, or list.
+            gen (str, optional): Name for the new duplicate-tag variable.
+                Required when cmd="tag".
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> tab.data.duplicates("report")
+            >>> tab.data.duplicates("tag", vars="id", gen="dup")
+            >>> tab.data.duplicates("drop", vars="id")
+        """
+        cmd = cmd.lower()
+        valid_cmds = {"report", "examples", "list", "tag", "drop"}
+        if cmd not in valid_cmds:
+            raise ValueError(
+                f"cmd must be one of {sorted(valid_cmds)}, got '{cmd}'"
+            )
+
+        df = self._tabra._df
+        check_cols = self._parse_vars(vars) if vars is not None else list(df.columns)
+
+        for v in check_cols:
+            if v not in df.columns:
+                raise KeyError(f"Variable '{v}' not found in DataFrame")
+
+        # Find duplicate mask
+        dup_mask = df.duplicated(subset=check_cols, keep=False)
+        has_dup = df.duplicated(subset=check_cols, keep="first")
+
+        if cmd == "report":
+            n_total = len(df)
+            n_unique = (~dup_mask).sum()
+            n_dup_groups = dup_mask.sum() - has_dup.sum()  # unique groups that have dups
+            grouped = df.groupby(check_cols).size()
+            groups_with_dups = (grouped > 1).sum()
+            n_excess = has_dup.sum()
+            print(f"Duplicates report")
+            print(f"  Observations:     {n_total}")
+            print(f"  Unique obs:       {n_unique}")
+            print(f"  Duplicate groups: {groups_with_dups}")
+            print(f"  Excess obs:       {n_excess}")
+
+        elif cmd == "examples":
+            dup_df = df[dup_mask]
+            if dup_df.empty:
+                print("No duplicates found.")
+            else:
+                # One representative per duplicate group
+                examples = dup_df.drop_duplicates(subset=check_cols, keep="first")
+                print(examples.to_string(index=True))
+
+        elif cmd == "list":
+            dup_df = df[dup_mask]
+            if dup_df.empty:
+                print("No duplicates found.")
+            else:
+                print(dup_df.to_string(index=True))
+
+        elif cmd == "tag":
+            if gen is None:
+                raise ValueError(
+                    "gen parameter is required for cmd='tag'. "
+                    "Usage: tab.data.duplicates('tag', gen='dup')"
+                )
+            if gen in df.columns:
+                raise ValueError(f"Variable '{gen}' already exists in DataFrame")
+            # tag = group_size - 1; 0 means unique
+            group_sizes = df.groupby(check_cols)[check_cols[0]].transform("count")
+            self._tabra._df[gen] = group_sizes - 1
+
+        elif cmd == "drop":
+            self._tabra._df = df.drop_duplicates(
+                subset=check_cols, keep="first"
+            ).reset_index(drop=True)
+
+        return self
+
+    def merge(
+        self,
+        right,
+        key: str | list[str],
+        *,
+        local_key: str | list[str] = None,
+        merge_type: str = "1:1",
+        varlist: str | list[str] = None,
+        gen: bool = True,
+        replace: bool = False,
+        assert_uniqueness: bool = False,
+    ):
+        """Merge another dataset horizontally (Stata merge).
+
+        Args:
+            right (pd.DataFrame or TabraData): Right (using) dataset.
+            key (str or list): Key column name(s) in the right table.
+            local_key (str or list, optional): Key column name(s) in the left
+                (master) table. Defaults to ``key``.
+            merge_type (str): One of "1:1", "m:1", "1:m". Only affects
+                uniqueness validation. Default "1:1".
+            varlist (str or list, optional): Right-table variables to merge.
+                Default None merges all columns.
+            gen (bool): If True, add a ``_merge`` indicator column. Default True.
+            replace (bool): If True, overwrite conflicting columns with right
+                values. Default False raises on conflict.
+            assert_uniqueness (bool): If True, validate key uniqueness per
+                merge_type. Default False.
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> tab.data.merge(right_tab, key="id")
+            >>> tab.data.merge(industry_tab, key="ind", local_key="industry",
+            ...                merge_type="m:1", assert_uniqueness=True)
+        """
+        from tabra.core.data import TabraData
+
+        if isinstance(right, TabraData):
+            right_df = right._df.copy()
+        elif isinstance(right, pd.DataFrame):
+            right_df = right.copy()
+        else:
+            raise TypeError(
+                f"Expected pd.DataFrame or TabraData, got {type(right).__name__}"
+            )
+
+        left_df = self._tabra._df
+
+        # Parse keys
+        right_keys = self._parse_vars(key)
+        left_keys = self._parse_vars(local_key) if local_key is not None else right_keys
+
+        if len(left_keys) != len(right_keys):
+            raise ValueError(
+                f"local_key ({len(left_keys)} keys) and key "
+                f"({len(right_keys)} keys) must have the same length"
+            )
+
+        # Validate keys exist
+        for lk, rk in zip(left_keys, right_keys):
+            if lk not in left_df.columns:
+                raise KeyError(f"Left key '{lk}' not found in DataFrame")
+            if rk not in right_df.columns:
+                raise KeyError(f"Right key '{rk}' not found in right DataFrame")
+
+        # Uniqueness validation
+        if assert_uniqueness:
+            merge_type = merge_type.lower()
+            if merge_type == "1:1":
+                if left_df.duplicated(subset=left_keys).any():
+                    raise ValueError(
+                        f"Left key {left_keys} has duplicates; "
+                        f"merge_type='1:1' requires unique keys on both sides"
+                    )
+                if right_df.duplicated(subset=right_keys).any():
+                    raise ValueError(
+                        f"Right key {right_keys} has duplicates; "
+                        f"merge_type='1:1' requires unique keys on both sides"
+                    )
+            elif merge_type == "m:1":
+                if right_df.duplicated(subset=right_keys).any():
+                    raise ValueError(
+                        f"Right key {right_keys} has duplicates; "
+                        f"merge_type='m:1' requires unique keys on right side"
+                    )
+            elif merge_type == "1:m":
+                if left_df.duplicated(subset=left_keys).any():
+                    raise ValueError(
+                        f"Left key {left_keys} has duplicates; "
+                        f"merge_type='1:m' requires unique keys on left side"
+                    )
+            else:
+                raise ValueError(
+                    f"merge_type must be '1:1', 'm:1', or '1:m', "
+                    f"got '{merge_type}'"
+                )
+
+        # Filter right columns via varlist
+        if varlist is not None:
+            keep_cols = self._parse_vars(varlist)
+            for v in keep_cols:
+                if v not in right_df.columns:
+                    raise KeyError(f"Variable '{v}' not found in right DataFrame")
+            # Always keep key columns
+            right_df = right_df[right_keys + [c for c in keep_cols if c not in right_keys]]
+
+        # Detect conflicting columns (non-key columns that exist in both)
+        conflict_cols = [
+            c for c in right_df.columns
+            if c not in right_keys and c in left_df.columns
+        ]
+        if conflict_cols and not replace:
+            raise ValueError(
+                f"Conflicting columns {conflict_cols} exist in both tables. "
+                f"Use replace=True to overwrite with right values, "
+                f"or use varlist to exclude them."
+            )
+
+        # Rename right keys to match left keys for merge
+        rename_map = {rk: lk for rk, lk in zip(right_keys, left_keys) if rk != lk}
+        if rename_map:
+            right_df = right_df.rename(columns=rename_map)
+
+        merge_keys = left_keys  # after rename, both sides use left key names
+
+        # Perform outer merge
+        result = pd.merge(
+            left_df, right_df,
+            on=merge_keys,
+            how="outer",
+            suffixes=("", "_right"),
+            indicator="_merge_raw" if gen else False,
+        )
+
+        # Handle conflicts: if replace, overwrite with right values
+        if conflict_cols and replace:
+            for col in conflict_cols:
+                right_col = f"{col}_right"
+                if right_col in result.columns:
+                    result[col] = result[right_col]
+                    result = result.drop(columns=[right_col])
+
+        # Clean up any remaining _right columns
+        right_suffix_cols = [c for c in result.columns if c.endswith("_right")]
+        if right_suffix_cols:
+            result = result.drop(columns=right_suffix_cols)
+
+        # Convert _merge indicator to Stata-style labels
+        if gen:
+            label_map = {
+                "left_only": "left_only",
+                "right_only": "right_only",
+                "both": "both",
+            }
+            result["_merge"] = result["_merge_raw"].map(label_map)
+            result = result.drop(columns=["_merge_raw"])
+
+        self._tabra._df = result
+        return self
+
     def _append(self, other: pd.DataFrame):
         """Concatenate another DataFrame vertically (Stata append)."""
         self._tabra._df = pd.concat(

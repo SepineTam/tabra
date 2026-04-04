@@ -792,3 +792,623 @@ class TestDataOpsEgen:
         tab.data.sort("industry")
         assert "mean_wage" in tab._df.columns
         assert "max_wage" in tab._df.columns
+
+
+class TestDataOpsMerge:
+    @pytest.fixture
+    def master_df(self):
+        return pd.DataFrame({
+            "id": [1, 2, 3, 4],
+            "wage": [100, 200, 300, 400],
+        })
+
+    @pytest.fixture
+    def using_df(self):
+        return pd.DataFrame({
+            "id": [1, 2, 4, 5],
+            "age": [25, 30, 40, 50],
+        })
+
+    def test_merge_1to1_basic(self, master_df, using_df):
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(using_df, key="id")
+        assert set(tab._df.columns) == {"id", "wage", "age", "_merge"}
+        assert len(tab._df) == 5  # 1,2,3,4 from master + 5 from using
+        # id=3: left_only, id=5: right_only, rest: both
+        merge_vals = tab._df.set_index("id")["_merge"]
+        assert merge_vals.loc[1] == "both"
+        assert merge_vals.loc[3] == "left_only"
+        assert merge_vals.loc[5] == "right_only"
+
+    def test_merge_no_indicator(self, master_df, using_df):
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(using_df, key="id", gen=False)
+        assert "_merge" not in tab._df.columns
+        assert "age" in tab._df.columns
+
+    def test_merge_varlist(self, master_df):
+        right = pd.DataFrame({
+            "id": [1, 2],
+            "age": [25, 30],
+            "height": [170, 180],
+        })
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(right, key="id", varlist=["age"])
+        assert "age" in tab._df.columns
+        assert "height" not in tab._df.columns
+
+    def test_merge_varlist_string(self, master_df):
+        right = pd.DataFrame({
+            "id": [1, 2],
+            "age": [25, 30],
+            "height": [170, 180],
+        })
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(right, key="id", varlist="age")
+        assert "age" in tab._df.columns
+        assert "height" not in tab._df.columns
+
+    def test_merge_conflict_raises(self, master_df):
+        right = pd.DataFrame({
+            "id": [1, 2],
+            "wage": [999, 888],  # conflicts with master's wage
+        })
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(ValueError, match="Conflicting"):
+            tab.data.merge(right, key="id")
+
+    def test_merge_replace_conflict(self, master_df):
+        right = pd.DataFrame({
+            "id": [1, 2],
+            "wage": [999, 888],
+        })
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(right, key="id", replace=True)
+        assert tab._df.loc[0, "wage"] == 999
+        assert tab._df.loc[1, "wage"] == 888
+
+    def test_merge_multi_key(self):
+        left = pd.DataFrame({
+            "firm": [1, 1, 2, 2],
+            "year": [2020, 2021, 2020, 2021],
+            "revenue": [100, 110, 200, 210],
+        })
+        right = pd.DataFrame({
+            "firm": [1, 1, 2],
+            "year": [2020, 2021, 2020],
+            "tax": [10, 11, 20],
+        })
+        tab = load_data(left, is_display_result=False)
+        tab.data.merge(right, key=["firm", "year"])
+        assert "tax" in tab._df.columns
+        assert len(tab._df) == 4  # 3 from right + 1 left_only (firm=2,year=2021)
+
+    def test_merge_local_key(self, master_df):
+        right = pd.DataFrame({
+            "emp_id": [1, 2],
+            "dept": ["HR", "IT"],
+        })
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(right, key="emp_id", local_key="id")
+        assert "dept" in tab._df.columns
+        assert tab._df.loc[0, "dept"] == "HR"
+
+    def test_merge_mto1_assert(self, master_df):
+        # m:1: right must be unique on key
+        right = pd.DataFrame({
+            "id": [1, 1],  # duplicate!
+            "region": ["A", "B"],
+        })
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(ValueError, match="duplicates"):
+            tab.data.merge(right, key="id", merge_type="m:1",
+                           assert_uniqueness=True)
+
+    def test_merge_1to1_assert_left_dup(self):
+        left = pd.DataFrame({
+            "id": [1, 1],
+            "x": [10, 20],
+        })
+        right = pd.DataFrame({
+            "id": [1],
+            "y": [30],
+        })
+        tab = load_data(left, is_display_result=False)
+        with pytest.raises(ValueError, match="duplicates"):
+            tab.data.merge(right, key="id", merge_type="1:1",
+                           assert_uniqueness=True)
+
+    def test_merge_assert_invalid_type(self, master_df, using_df):
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(ValueError, match="merge_type must be"):
+            tab.data.merge(using_df, key="id", merge_type="m:m",
+                           assert_uniqueness=True)
+
+    def test_merge_tabradata(self, master_df, using_df):
+        tab = load_data(master_df, is_display_result=False)
+        right_tab = load_data(using_df, is_display_result=False)
+        tab.data.merge(right_tab, key="id")
+        assert "age" in tab._df.columns
+        assert "_merge" in tab._df.columns
+
+    def test_merge_invalid_right_raises(self, master_df):
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(TypeError):
+            tab.data.merge("not_a_df", key="id")
+
+    def test_merge_missing_key_raises(self, master_df):
+        right = pd.DataFrame({"emp_id": [1], "age": [25]})
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.merge(right, key="id")  # id not in right
+
+    def test_merge_returns_self(self, master_df, using_df):
+        tab = load_data(master_df, is_display_result=False)
+        result = tab.data.merge(using_df, key="id")
+        assert result is not None
+
+    def test_merge_chaining(self, master_df, using_df):
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(using_df, key="id").sort("id")
+        ids = tab._df["id"].tolist()
+        assert ids == sorted(ids)
+
+    def test_merge_varlist_missing_raises(self, master_df):
+        right = pd.DataFrame({"id": [1], "age": [25]})
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.merge(right, key="id", varlist="nonexistent")
+
+    def test_merge_local_key_length_mismatch(self, master_df):
+        right = pd.DataFrame({"a": [1], "b": [2], "val": [99]})
+        tab = load_data(master_df, is_display_result=False)
+        with pytest.raises(ValueError, match="same length"):
+            tab.data.merge(right, key=["a", "b"], local_key="id")
+
+    def test_merge_1to1_no_assert_allows_dups(self, master_df):
+        # Without assert_uniqueness, duplicates are fine
+        right = pd.DataFrame({
+            "id": [1, 1],
+            "extra": ["a", "b"],
+        })
+        tab = load_data(master_df, is_display_result=False)
+        tab.data.merge(right, key="id")  # no error
+        assert "extra" in tab._df.columns
+
+
+class TestDataOpsReshapeLong:
+    @pytest.fixture
+    def wide_df(self):
+        return pd.DataFrame({
+            "firm": ["A", "B"],
+            "wage_2020": [100, 200],
+            "wage_2021": [110, 210],
+        })
+
+    def test_reshape_long_basic(self, wide_df):
+        tab = load_data(wide_df, is_display_result=False)
+        tab.data.reshape_long("wage", i="firm", j="year")
+        assert set(tab._df.columns) == {"firm", "year", "wage"}
+        assert len(tab._df) == 4  # 2 firms x 2 years
+        # Check values
+        a_rows = tab._df[tab._df["firm"] == "A"].sort_values("year")
+        assert list(a_rows["wage"]) == [100, 110]
+
+    def test_reshape_long_default_j(self, wide_df):
+        tab = load_data(wide_df, is_display_result=False)
+        tab.data.reshape_long("wage", i="firm")
+        assert "_j" in tab._df.columns
+
+    def test_reshape_long_multi_stub(self):
+        df = pd.DataFrame({
+            "firm": ["A", "B"],
+            "wage_2020": [100, 200],
+            "wage_2021": [110, 210],
+            "hours_2020": [40, 45],
+            "hours_2021": [42, 47],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.reshape_long(["wage", "hours"], i="firm", j="year")
+        assert set(tab._df.columns) == {"firm", "year", "wage", "hours"}
+        assert len(tab._df) == 4
+
+    def test_reshape_long_stub_string(self):
+        df = pd.DataFrame({
+            "firm": ["A", "B"],
+            "wage_2020": [100, 200],
+            "wage_2021": [110, 210],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.reshape_long("wage", i="firm", j="year")
+        assert "wage" in tab._df.columns
+
+    def test_reshape_long_missing_i_raises(self):
+        df = pd.DataFrame({"wage_2020": [100], "wage_2021": [110]})
+        tab = load_data(df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.reshape_long("wage", i="firm")
+
+    def test_reshape_long_no_matching_stub_raises(self):
+        df = pd.DataFrame({"firm": ["A"], "salary_2020": [100]})
+        tab = load_data(df, is_display_result=False)
+        with pytest.raises(KeyError, match="No columns found"):
+            tab.data.reshape_long("wage", i="firm")
+
+    def test_reshape_long_returns_self(self, wide_df):
+        tab = load_data(wide_df, is_display_result=False)
+        result = tab.data.reshape_long("wage", i="firm", j="year")
+        assert result is not None
+
+    def test_reshape_long_chaining(self, wide_df):
+        tab = load_data(wide_df, is_display_result=False)
+        tab.data.reshape_long("wage", i="firm", j="year").sort("firm")
+        assert "wage" in tab._df.columns
+
+
+class TestDataOpsReshapeWide:
+    @pytest.fixture
+    def long_df(self):
+        return pd.DataFrame({
+            "firm": ["A", "A", "B", "B"],
+            "year": [2020, 2021, 2020, 2021],
+            "wage": [100, 110, 200, 210],
+        })
+
+    def test_reshape_wide_basic(self, long_df):
+        tab = load_data(long_df, is_display_result=False)
+        tab.data.reshape_wide("wage", i="firm", j="year")
+        assert "wage_2020" in tab._df.columns
+        assert "wage_2021" in tab._df.columns
+        assert len(tab._df) == 2
+
+    def test_reshape_wide_multi_stub(self):
+        df = pd.DataFrame({
+            "firm": ["A", "A", "B", "B"],
+            "year": [2020, 2021, 2020, 2021],
+            "wage": [100, 110, 200, 210],
+            "hours": [40, 42, 45, 47],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.reshape_wide(["wage", "hours"], i="firm", j="year")
+        assert "wage_2020" in tab._df.columns
+        assert "hours_2021" in tab._df.columns
+        assert len(tab._df) == 2
+
+    def test_reshape_wide_missing_i_raises(self):
+        df = pd.DataFrame({"year": [2020], "wage": [100]})
+        tab = load_data(df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.reshape_wide("wage", i="firm", j="year")
+
+    def test_reshape_wide_missing_j_raises(self):
+        df = pd.DataFrame({"firm": ["A"], "wage": [100]})
+        tab = load_data(df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.reshape_wide("wage", i="firm", j="year")
+
+    def test_reshape_wide_missing_stub_raises(self):
+        df = pd.DataFrame({"firm": ["A"], "year": [2020], "salary": [100]})
+        tab = load_data(df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.reshape_wide("wage", i="firm", j="year")
+
+    def test_reshape_wide_returns_self(self, long_df):
+        tab = load_data(long_df, is_display_result=False)
+        result = tab.data.reshape_wide("wage", i="firm", j="year")
+        assert result is not None
+
+    def test_reshape_round_trip(self):
+        """wide → long → wide should recover original data."""
+        original = pd.DataFrame({
+            "firm": ["A", "B"],
+            "wage_2020": [100, 200],
+            "wage_2021": [110, 210],
+        })
+        tab = load_data(original.copy(), is_display_result=False)
+        tab.data.reshape_long("wage", i="firm", j="year")
+        tab.data.reshape_wide("wage", i="firm", j="year")
+        assert "wage_2020" in tab._df.columns
+        assert "wage_2021" in tab._df.columns
+        a_row = tab._df[tab._df["firm"] == "A"]
+        assert a_row["wage_2020"].values[0] == 100
+        assert a_row["wage_2021"].values[0] == 110
+
+
+class TestDataOpsCollapse:
+    @pytest.fixture
+    def collapse_df(self):
+        return pd.DataFrame({
+            "industry": ["A", "A", "B", "B", "C"],
+            "wage": [100, 200, 300, 400, 500],
+            "age": [25, 30, 35, 40, 45],
+        })
+
+    def test_collapse_mean_by(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("mean", vars="wage age", by="industry")
+        assert len(tab._df) == 3
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 150.0
+        assert a_row["age"].values[0] == 27.5
+
+    def test_collapse_mean_no_by(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("mean", vars="wage age")
+        assert len(tab._df) == 1
+        assert tab._df["wage"].values[0] == 300.0
+
+    def test_collapse_all_numeric_no_vars(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("mean", by="industry")
+        assert len(tab._df) == 3
+        assert "wage" in tab._df.columns
+        assert "age" in tab._df.columns
+
+    def test_collapse_median(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("median", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 150.0
+
+    def test_collapse_sum(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("sum", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 300.0
+
+    def test_collapse_sd(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("sd", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        expected_sd = np.std([100, 200], ddof=1)
+        assert abs(a_row["wage"].values[0] - expected_sd) < 1e-10
+
+    def test_collapse_min_max(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("min", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 100
+
+        tab2 = load_data(collapse_df, is_display_result=False)
+        tab2.data.collapse("max", vars="wage", by="industry")
+        a_row2 = tab2._df[tab2._df["industry"] == "A"]
+        assert a_row2["wage"].values[0] == 200
+
+    def test_collapse_count(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("count", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 2
+
+    def test_collapse_first_last(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("first", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 100
+
+        tab2 = load_data(collapse_df, is_display_result=False)
+        tab2.data.collapse("last", vars="wage", by="industry")
+        a_row2 = tab2._df[tab2._df["industry"] == "A"]
+        assert a_row2["wage"].values[0] == 200
+
+    def test_collapse_percentile(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("p50", vars="wage", by="industry")
+        a_row = tab._df[tab._df["industry"] == "A"]
+        assert a_row["wage"].values[0] == 150.0  # p50 = median
+
+    def test_collapse_multi_by(self):
+        df = pd.DataFrame({
+            "state": ["CA", "CA", "CA", "NY", "NY"],
+            "year": [2020, 2020, 2021, 2020, 2021],
+            "wage": [100, 200, 300, 400, 500],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.collapse("mean", vars="wage", by=["state", "year"])
+        assert len(tab._df) == 4
+        ca_2020 = tab._df[(tab._df["state"] == "CA") & (tab._df["year"] == 2020)]
+        assert ca_2020["wage"].values[0] == 150.0
+
+    def test_collapse_vars_list(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("mean", vars=["wage", "age"], by="industry")
+        assert "wage" in tab._df.columns
+        assert "age" in tab._df.columns
+
+    def test_collapse_by_string(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        tab.data.collapse("mean", vars="wage", by="industry")
+        assert len(tab._df) == 3
+
+    def test_collapse_missing_var_raises(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.collapse("mean", vars="nonexistent", by="industry")
+
+    def test_collapse_missing_by_raises(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.collapse("mean", vars="wage", by="nonexistent")
+
+    def test_collapse_unknown_stat_raises(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        with pytest.raises(ValueError, match="Unknown stat"):
+            tab.data.collapse("oops", vars="wage", by="industry")
+
+    def test_collapse_returns_self(self, collapse_df):
+        tab = load_data(collapse_df, is_display_result=False)
+        result = tab.data.collapse("mean", vars="wage", by="industry")
+        assert result is not None
+
+    def test_collapse_iqr(self):
+        df = pd.DataFrame({
+            "g": ["A", "A", "A", "A"],
+            "x": [10, 20, 30, 40],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.collapse("iqr", vars="x", by="g")
+        assert tab._df["x"].values[0] == 15.0  # Q3(35) - Q1(20) = 15
+
+
+class TestDataOpsDuplicates:
+    @pytest.fixture
+    def dup_df(self):
+        return pd.DataFrame({
+            "id": [1, 1, 2, 3, 3, 3],
+            "name": ["A", "A", "B", "C", "C", "C"],
+            "value": [10, 10, 20, 30, 30, 30],
+        })
+
+    @pytest.fixture
+    def no_dup_df(self):
+        return pd.DataFrame({
+            "id": [1, 2, 3],
+            "name": ["A", "B", "C"],
+        })
+
+    # --- report ---
+    def test_report_no_duplicates(self, no_dup_df, capsys):
+        tab = load_data(no_dup_df, is_display_result=False)
+        tab.data.duplicates("report")
+        captured = capsys.readouterr()
+        assert "0" in captured.out  # 0 duplicate groups
+
+    def test_report_with_duplicates(self, dup_df, capsys):
+        tab = load_data(dup_df, is_display_result=False)
+        tab.data.duplicates("report")
+        captured = capsys.readouterr()
+        assert "6" in captured.out  # 6 total obs
+
+    def test_report_does_not_modify(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        orig_len = len(tab._df)
+        tab.data.duplicates("report")
+        assert len(tab._df) == orig_len
+
+    def test_report_by_vars(self, dup_df, capsys):
+        tab = load_data(dup_df, is_display_result=False)
+        tab.data.duplicates("report", vars="id")
+        captured = capsys.readouterr()
+        assert "id" in captured.out or "2" in captured.out
+
+    # --- examples ---
+    def test_examples_with_duplicates(self, dup_df, capsys):
+        tab = load_data(dup_df, is_display_result=False)
+        tab.data.duplicates("examples")
+        captured = capsys.readouterr()
+        assert "A" in captured.out or "C" in captured.out
+
+    def test_examples_no_duplicates(self, no_dup_df, capsys):
+        tab = load_data(no_dup_df, is_display_result=False)
+        tab.data.duplicates("examples")
+        captured = capsys.readouterr()
+        assert "No duplicates" in captured.out
+
+    def test_examples_does_not_modify(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        orig_len = len(tab._df)
+        tab.data.duplicates("examples")
+        assert len(tab._df) == orig_len
+
+    # --- list ---
+    def test_list_with_duplicates(self, dup_df, capsys):
+        tab = load_data(dup_df, is_display_result=False)
+        tab.data.duplicates("list")
+        captured = capsys.readouterr()
+        assert "10" in captured.out
+
+    def test_list_no_duplicates(self, no_dup_df, capsys):
+        tab = load_data(no_dup_df, is_display_result=False)
+        tab.data.duplicates("list")
+        captured = capsys.readouterr()
+        assert "No duplicates" in captured.out
+
+    def test_list_does_not_modify(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        orig_len = len(tab._df)
+        tab.data.duplicates("list")
+        assert len(tab._df) == orig_len
+
+    # --- tag ---
+    def test_tag_basic(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        tab.data.duplicates("tag", gen="dup")
+        assert "dup" in tab._df.columns
+        # id=2 is unique → tag=0; id=1 has 2 copies → both tag=1; id=3 has 3 → all tag=2
+        assert tab._df.loc[0, "dup"] == 1  # id=1, first of 2
+        assert tab._df.loc[2, "dup"] == 0  # id=2, unique
+
+    def test_tag_with_vars(self, dup_df):
+        df = pd.DataFrame({
+            "id": [1, 1, 2],
+            "value": [10, 20, 30],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.duplicates("tag", vars="id", gen="dup")
+        # Both id=1 rows are tagged as duplicates
+        assert tab._df.loc[0, "dup"] == 1
+        assert tab._df.loc[1, "dup"] == 1
+        assert tab._df.loc[2, "dup"] == 0
+
+    def test_tag_no_gen_raises(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        with pytest.raises(ValueError, match="gen"):
+            tab.data.duplicates("tag")
+
+    def test_tag_existing_gen_raises(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        with pytest.raises(ValueError, match="already exists"):
+            tab.data.duplicates("tag", gen="id")
+
+    def test_tag_no_duplicates(self, no_dup_df):
+        tab = load_data(no_dup_df, is_display_result=False)
+        tab.data.duplicates("tag", gen="dup")
+        assert all(tab._df["dup"] == 0)
+
+    # --- drop ---
+    def test_drop_basic(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        tab.data.duplicates("drop")
+        assert len(tab._df) == 3  # 3 unique rows: (1,A,10), (2,B,20), (3,C,30)
+
+    def test_drop_with_vars(self):
+        df = pd.DataFrame({
+            "id": [1, 1, 2, 3],
+            "value": [10, 20, 30, 40],
+        })
+        tab = load_data(df, is_display_result=False)
+        tab.data.duplicates("drop", vars="id")
+        assert len(tab._df) == 3  # id=1,2,3
+        assert tab._df.loc[0, "value"] == 10  # keeps first
+
+    def test_drop_no_duplicates(self, no_dup_df):
+        tab = load_data(no_dup_df, is_display_result=False)
+        tab.data.duplicates("drop")
+        assert len(tab._df) == 3
+
+    # --- error cases ---
+    def test_invalid_cmd_raises(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        with pytest.raises(ValueError, match="cmd must be"):
+            tab.data.duplicates("oops")
+
+    def test_missing_var_raises(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        with pytest.raises(KeyError, match="not found"):
+            tab.data.duplicates("report", vars="nonexistent")
+
+    # --- returns self ---
+    def test_returns_self(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        result = tab.data.duplicates("report")
+        assert result is not None
+
+    def test_tag_returns_self(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        result = tab.data.duplicates("tag", gen="dup")
+        assert result is not None
+
+    def test_drop_returns_self(self, dup_df):
+        tab = load_data(dup_df, is_display_result=False)
+        result = tab.data.duplicates("drop")
+        assert result is not None
