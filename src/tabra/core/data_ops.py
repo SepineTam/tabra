@@ -1076,6 +1076,72 @@ class DataOps:
 
         return result
 
+    def sum(
+        self,
+        var_list: list[str] | str = None,
+        *,
+        detail: bool = False,
+    ):
+        """Compute summary statistics for numeric variables (Stata summarize).
+
+        Args:
+            var_list (str or list, optional): Variable name(s) or regex.
+                None uses all numeric columns. Default None.
+            detail (bool): Include percentiles, skewness, kurtosis. Default False.
+
+        Returns:
+            SummarizeResult: Summary statistics result.
+
+        Example:
+            >>> dta.data.sum()
+            >>> dta.data.sum(["price", "weight", "mpg"])
+            >>> dta.data.sum("^r", detail=True)
+        """
+        from tabra.results.summarize_result import SummarizeResult
+        from scipy.stats import skew as scipy_skew, kurtosis as scipy_kurtosis
+        import numpy as np
+
+        df = self._tabra._df
+
+        if var_list is not None:
+            cols = self._resolve_vars(var_list)
+        else:
+            cols = df.select_dtypes(include="number").columns.tolist()
+
+        obs, mean, std, min_val, max_val = {}, {}, {}, {}, {}
+        percentiles, skewness, kurtosis = {}, {}, {}
+
+        for col in cols:
+            series = df[col].dropna()
+            obs[col] = len(series)
+            mean[col] = float(series.mean())
+            std[col] = float(series.std(ddof=1))
+            min_val[col] = float(series.min())
+            max_val[col] = float(series.max())
+
+            if detail:
+                percentiles[col] = {}
+                for p in [1, 5, 10, 25, 50, 75, 90, 95, 99]:
+                    percentiles[col][f"{p}%"] = float(np.percentile(series, p))
+                skewness[col] = float(scipy_skew(series, bias=False))
+                kurtosis[col] = float(scipy_kurtosis(series, bias=False))
+
+        result = SummarizeResult(
+            var_names=cols, obs=obs, mean=mean, std=std,
+            min_val=min_val, max_val=max_val,
+            percentiles=percentiles if detail else None,
+            skewness=skewness if detail else None,
+            kurtosis=kurtosis if detail else None,
+            detail=detail,
+        )
+        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
+        self._tabra._result = result
+
+        if getattr(self._tabra, '_is_display_result', True):
+            result.set_display(True)
+
+        return result
+
     def describe(self, vars: list[str] | str = None):
         """Print variable overview (Stata describe).
 
@@ -1205,19 +1271,19 @@ class DataOps:
     ):
         """Compute transition probability matrix (Stata xttrans).
 
-        Requires panel settings from ``xeset()`` unless ``id`` and ``time``
+        Requires panel settings from ``xtset()`` unless ``id`` and ``time``
         are passed explicitly.
 
         Args:
             var (str): State variable to compute transitions for.
-            id (str, optional): Panel identifier. Defaults to xeset value.
-            time (str, optional): Time variable. Defaults to xeset value.
+            id (str, optional): Panel identifier. Defaults to xtset value.
+            time (str, optional): Time variable. Defaults to xtset value.
 
         Returns:
             XttransResult: Result with count_matrix, prob_matrix, state_labels.
 
         Example:
-            >>> dta.xeset("idcode", "year")
+            >>> dta.xtset("idcode", "year")
             >>> dta.data.xttrans("status")
         """
         from tabra.results.xttrans_result import XttransResult
@@ -1226,18 +1292,18 @@ class DataOps:
         if var not in df.columns:
             raise KeyError(f"Variable '{var}' not found in DataFrame")
 
-        # Resolve id and time from xeset if not provided
+        # Resolve id and time from xtset if not provided
         id_var = id or getattr(self._tabra, '_panel_var', None)
         time_var = time or getattr(self._tabra, '_time_var', None)
 
         if id_var is None:
             raise ValueError(
-                "Panel id not set. Call dta.xeset() first, "
+                "Panel id not set. Call dta.xtset() first, "
                 "or pass id= and time= explicitly."
             )
         if time_var is None:
             raise ValueError(
-                "Time variable not set. Call dta.xeset() first, "
+                "Time variable not set. Call dta.xtset() first, "
                 "or pass id= and time= explicitly."
             )
 

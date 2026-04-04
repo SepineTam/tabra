@@ -140,7 +140,7 @@ class TabraData:
 
         Example:
             >>> dta = load_data("nlswork")
-            >>> dta.xeset("idcode", "year")
+            >>> dta.xtset("idcode", "year")
             >>> result = dta.reghdfe("ln_wage", ["age", "tenure"], absorb=["idcode", "year"])
         """
         model = RegHDFE()
@@ -152,7 +152,7 @@ class TabraData:
             result.set_display(True)
         return result
 
-    def xeset(self, panel_var: str = None, time_var: str = None, clear: bool = False):
+    def xtset(self, panel_var: str = None, time_var: str = None, clear: bool = False):
         """Set or clear panel variables for panel data estimation.
 
         Args:
@@ -162,18 +162,18 @@ class TabraData:
 
         Example:
             >>> dta = load_data("nlswork")
-            >>> dta.xeset("idcode", "year")
+            >>> dta.xtset("idcode", "year")
         """
         if clear:
             self._panel_var = None
             self._time_var = None
             return
         if panel_var is None:
-            raise ValueError("panel_var is required, or use xeset(clear=True) to clear")
+            raise ValueError("panel_var is required, or use xtset(clear=True) to clear")
         self._panel_var = panel_var
         self._time_var = time_var
 
-    def xereg(self, y: str, x: list[str], model: str = "fe", is_con: bool = True):
+    def xtreg(self, y: str, x: list[str], model: str = "fe", is_con: bool = True):
         """Fit a panel data regression model.
 
         Args:
@@ -187,11 +187,11 @@ class TabraData:
 
         Example:
             >>> dta = load_data("nlswork")
-            >>> dta.xeset("idcode", "year")
-            >>> result = dta.xereg("ln_wage", ["age", "tenure"], model="fe")
+            >>> dta.xtset("idcode", "year")
+            >>> result = dta.xtreg("ln_wage", ["age", "tenure"], model="fe")
         """
         if self._panel_var is None:
-            raise ValueError("Call xeset() first to set panel variables")
+            raise ValueError("Call xtset() first to set panel variables")
         panel_model = PanelModel()
         result = panel_model.fit(self._df, y, x, self._panel_var, model=model, is_con=is_con)
         result.set_style(self._style)
@@ -589,7 +589,7 @@ class TabraData:
 
         Example:
             >>> dta = load_data("nlswork")
-            >>> dta.xeset("idcode", "year")
+            >>> dta.xtset("idcode", "year")
             >>> result = dta.ivreghdfe("ln_wage", exog=["age"],
             ...     endog=["tenure"], iv=["union"], absorb=["idcode"])
         """
@@ -607,6 +607,9 @@ class TabraData:
     def summarize(self, var_list: list[str] = None, detail: bool = False):
         """Compute summary statistics for numeric variables.
 
+        .. deprecated::
+            Use ``dta.data.sum()`` instead.
+
         Args:
             var_list (list[str]): Variable names to summarize. If None, all numeric columns are used.
             detail (bool): If True, include percentiles, skewness, and kurtosis. Default False.
@@ -619,43 +622,13 @@ class TabraData:
             >>> dta.summarize(["price", "weight", "mpg"])
             >>> dta.summarize(detail=True)
         """
-        from tabra.results.summarize_result import SummarizeResult
-        from scipy.stats import skew as scipy_skew, kurtosis as scipy_kurtosis
-
-        if var_list is None:
-            var_list = self._df.select_dtypes(include="number").columns.tolist()
-
-        obs, mean, std, min_val, max_val = {}, {}, {}, {}, {}
-        percentiles, skewness, kurtosis = {}, {}, {}
-
-        for col in var_list:
-            series = self._df[col].dropna()
-            obs[col] = len(series)
-            mean[col] = float(series.mean())
-            std[col] = float(series.std(ddof=1))
-            min_val[col] = float(series.min())
-            max_val[col] = float(series.max())
-
-            if detail:
-                percentiles[col] = {}
-                for p in [1, 5, 10, 25, 50, 75, 90, 95, 99]:
-                    percentiles[col][f"{p}%"] = float(np.percentile(series, p))
-                skewness[col] = float(scipy_skew(series, bias=False))
-                kurtosis[col] = float(scipy_kurtosis(series, bias=False))
-
-        result = SummarizeResult(
-            var_names=var_list, obs=obs, mean=mean, std=std,
-            min_val=min_val, max_val=max_val,
-            percentiles=percentiles if detail else None,
-            skewness=skewness if detail else None,
-            kurtosis=kurtosis if detail else None,
-            detail=detail,
+        import warnings
+        warnings.warn(
+            "dta.summarize() is deprecated, use dta.data.sum() instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        result.set_style(self._style)
-        self._result = result
-        if self._is_display_result:
-            result.set_display(True)
-        return result
+        return self.data.sum(var_list, detail=detail)
 
     def gen(self, var: str, expr: str):
         warnings.warn("Use tab.data.gen() instead of tab.gen()", DeprecationWarning, stacklevel=2)

@@ -59,15 +59,13 @@ def fe_data():
     se_oracle = np.sqrt(sigma2_e * np.diag(XtX_inv))
     t_oracle = beta_oracle / se_oracle
 
-    # sigma_u: between-group variance
+    # sigma_u: standard deviation of estimated fixed effects
     group_means_y = np.array([y[group_id == i].mean() for i in range(n_groups)])
     group_means_x1 = np.array([x1[group_id == i].mean() for i in range(n_groups)])
     group_means_x2 = np.array([x2[group_id == i].mean() for i in range(n_groups)])
-    X_between = np.column_stack([np.ones(n_groups), group_means_x1, group_means_x2])
-    beta_between = np.linalg.lstsq(X_between, group_means_y, rcond=None)[0]
-    resid_b = group_means_y - X_between @ beta_between
-    SSR_b = float(resid_b @ resid_b)
-    sigma2_u = max(0.0, SSR_b / (n_groups - k - 1) - sigma2_e / T)
+    group_means_X = np.column_stack([group_means_x1, group_means_x2])
+    alpha_hat = group_means_y - group_means_X @ beta_oracle
+    sigma2_u = float(np.var(alpha_hat, ddof=1))
     sigma_u = np.sqrt(sigma2_u)
     sigma_e = np.sqrt(sigma2_e)
     rho = sigma2_u / (sigma2_u + sigma2_e)
@@ -92,7 +90,7 @@ def fe_data():
 # ============ FE (Within Estimator) ============
 
 def test_fe_coefficients_match_oracle(fe_data):
-    """FE 系数应与 numpy within oracle 一致"""
+    """FE 斜率系数应与 numpy within oracle 一致（含 _cons）"""
     from tabra.models.estimate.panel import PanelModel
 
     model = PanelModel()
@@ -100,11 +98,12 @@ def test_fe_coefficients_match_oracle(fe_data):
         fe_data["df"], y="y", x=["x1", "x2"],
         panel_var="group", model="fe", is_con=True,
     )
-    assert np.allclose(result.coef, fe_data["beta_oracle"], atol=1e-8)
+    k = fe_data["k"]
+    assert np.allclose(result.coef[:k], fe_data["beta_oracle"], atol=1e-8)
 
 
 def test_fe_std_errors_match_oracle(fe_data):
-    """FE 标准误应与 oracle 一致"""
+    """FE 斜率标准误应与 oracle 一致"""
     from tabra.models.estimate.panel import PanelModel
 
     model = PanelModel()
@@ -112,11 +111,12 @@ def test_fe_std_errors_match_oracle(fe_data):
         fe_data["df"], y="y", x=["x1", "x2"],
         panel_var="group", model="fe", is_con=True,
     )
-    assert np.allclose(result.std_err, fe_data["se_oracle"], atol=1e-8)
+    k = fe_data["k"]
+    assert np.allclose(result.std_err[:k], fe_data["se_oracle"], atol=1e-8)
 
 
 def test_fe_t_stats_match_oracle(fe_data):
-    """FE t 统计量应与 oracle 一致"""
+    """FE 斜率 t 统计量应与 oracle 一致"""
     from tabra.models.estimate.panel import PanelModel
 
     model = PanelModel()
@@ -124,7 +124,8 @@ def test_fe_t_stats_match_oracle(fe_data):
         fe_data["df"], y="y", x=["x1", "x2"],
         panel_var="group", model="fe", is_con=True,
     )
-    assert np.allclose(result.t_stat, fe_data["t_oracle"], atol=1e-6)
+    k = fe_data["k"]
+    assert np.allclose(result.t_stat[:k], fe_data["t_oracle"], atol=1e-6)
 
 
 def test_fe_sigma_u(fe_data):
@@ -175,8 +176,8 @@ def test_fe_df_resid(fe_data):
     assert result.df_resid == fe_data["df_resid"]
 
 
-def test_fe_var_names_no_cons(fe_data):
-    """FE 结果不应含 _cons（常数被固定效应吸收）"""
+def test_fe_var_names_has_cons(fe_data):
+    """FE 结果应含 _cons（平均固定效应）"""
     from tabra.models.estimate.panel import PanelModel
 
     model = PanelModel()
@@ -184,26 +185,27 @@ def test_fe_var_names_no_cons(fe_data):
         fe_data["df"], y="y", x=["x1", "x2"],
         panel_var="group", model="fe", is_con=True,
     )
-    assert "_cons" not in result.var_names
+    assert "_cons" in result.var_names
 
 
-def test_xeset_then_xereg(fe_data):
-    """通过 TabraData 的 xeset + xereg 调用"""
+def test_xtset_then_xtreg(fe_data):
+    """通过 TabraData 的 xtset + xtreg 调用"""
     from tabra.core.data import TabraData
 
     tab = TabraData(fe_data["df"], is_display_result=False)
-    tab.xeset("group")
-    result = tab.xereg("y", ["x1", "x2"], model="fe")
-    assert np.allclose(result.coef, fe_data["beta_oracle"], atol=1e-8)
+    tab.xtset("group")
+    result = tab.xtreg("y", ["x1", "x2"], model="fe")
+    k = fe_data["k"]
+    assert np.allclose(result.coef[:k], fe_data["beta_oracle"], atol=1e-8)
 
 
-def test_xereg_without_xeset_raises(fe_data):
-    """未调用 xeset 就调用 xereg 应报错"""
+def test_xtreg_without_xtset_raises(fe_data):
+    """未调用 xtset 就调用 xtreg 应报错"""
     from tabra.core.data import TabraData
 
     tab = TabraData(fe_data["df"])
-    with pytest.raises(ValueError, match="xeset"):
-        tab.xereg("y", ["x1", "x2"], model="fe")
+    with pytest.raises(ValueError, match="xtset"):
+        tab.xtreg("y", ["x1", "x2"], model="fe")
 
 
 # ============ BE (Between Estimator) ============
@@ -391,7 +393,7 @@ def re_data():
         for j in range(k):
             X_qd[mask, j] = X_arr[mask, j] - theta * gm_X[i, j]
 
-    X_qd_full = np.column_stack([np.ones(N), X_qd])
+    X_qd_full = np.column_stack([(1 - theta) * np.ones(N), X_qd])
     beta_re = np.linalg.lstsq(X_qd_full, y_qd, rcond=None)[0]
     resid_re = y_qd - X_qd_full @ beta_re
     SSR_re = float(resid_re @ resid_re)
@@ -506,7 +508,7 @@ def test_re_var_names_has_cons(re_data):
 
 @pytest.fixture
 def mle_data():
-    """Panel data with MLE oracle via concentrated log-likelihood."""
+    """Panel data with MLE oracle via Baltagi (2021) profile log-likelihood."""
     np.random.seed(42)
     n_groups = 20
     T = 5
@@ -523,52 +525,85 @@ def mle_data():
     X_arr = np.column_stack([x1, x2])
     k = 2
 
-    # Oracle: maximize concentrated log-likelihood over theta
-    from scipy.optimize import minimize_scalar
-
+    # Pre-compute per-group data
+    T_i = np.full(n_groups, T)  # balanced panel
     gm_y = np.array([y[group_id == i].mean() for i in range(n_groups)])
     gm_X = np.array([X_arr[group_id == i].mean(axis=0) for i in range(n_groups)])
+    group_indices = [np.where(group_id == i)[0] for i in range(n_groups)]
 
-    def _neg_cloglik(theta):
-        if theta <= 0 or theta >= 1:
-            return 1e20
+    from scipy.optimize import minimize
+
+    def _gls_solution(sigma2_u_val, sigma2_e_val):
+        theta_i = 1.0 - np.sqrt(sigma2_e_val / (sigma2_e_val + T_i * sigma2_u_val))
         y_qd = np.zeros(N)
         X_qd = np.zeros((N, k))
-        for i in range(n_groups):
-            mask = group_id == i
-            y_qd[mask] = y[mask] - theta * gm_y[i]
+        for idx in range(n_groups):
+            gi = group_indices[idx]
+            y_qd[gi] = y[gi] - theta_i[idx] * gm_y[idx]
             for j in range(k):
-                X_qd[mask, j] = X_arr[mask, j] - theta * gm_X[i, j]
-        X_qd_f = np.column_stack([np.ones(N), X_qd])
-        beta = np.linalg.lstsq(X_qd_f, y_qd, rcond=None)[0]
-        resid = y_qd - X_qd_f @ beta
-        sigma2 = float(resid @ resid) / N
-        cll = -N / 2 * np.log(sigma2) + n_groups / 2 * np.log(1 - theta)
-        return -cll
+                X_qd[gi, j] = X_arr[gi, j] - theta_i[idx] * gm_X[idx, j]
+        ones_qd = (1 - theta_i[0]) * np.ones(N)  # balanced, same theta
+        X_qd_full = np.column_stack([ones_qd, X_qd])
+        beta = np.linalg.lstsq(X_qd_full, y_qd, rcond=None)[0]
+        return beta, X_qd_full, y_qd
 
-    res = minimize_scalar(_neg_cloglik, bounds=(1e-6, 1 - 1e-6), method="bounded")
-    theta_opt = res.x
+    def _neg_profile_loglik(params):
+        log_su, log_se = params
+        sigma2_u_val = np.exp(log_su)
+        sigma2_e_val = np.exp(log_se)
+        if sigma2_u_val < 1e-20 or sigma2_e_val < 1e-20:
+            return 1e20
+        beta, _, _ = _gls_solution(sigma2_u_val, sigma2_e_val)
+        total_loglik = 0.0
+        for idx in range(n_groups):
+            gi = group_indices[idx]
+            Ti = T_i[idx]
+            yi = y[gi]
+            Xi = np.column_stack([np.ones(Ti), X_arr[gi]])
+            resid_i = yi - Xi @ beta
+            log_det = (Ti - 1) * np.log(sigma2_e_val) + np.log(sigma2_e_val + Ti * sigma2_u_val)
+            phi_i = sigma2_u_val / (sigma2_e_val + Ti * sigma2_u_val)
+            resid_sum = resid_i.sum()
+            quad_form = (resid_i @ resid_i - phi_i * resid_sum ** 2) / sigma2_e_val
+            total_loglik += -Ti / 2 * np.log(2 * np.pi) - 0.5 * log_det - 0.5 * quad_form
+        return -total_loglik
 
-    # Compute beta at optimal theta
-    y_qd = np.zeros(N)
-    X_qd = np.zeros((N, k))
+    # Initial values from Swamy-Arora
+    y_dm = np.zeros(N)
+    X_dm = np.zeros((N, k))
     for i in range(n_groups):
         mask = group_id == i
-        y_qd[mask] = y[mask] - theta_opt * gm_y[i]
+        y_dm[mask] = y[mask] - y[mask].mean()
         for j in range(k):
-            X_qd[mask, j] = X_arr[mask, j] - theta_opt * gm_X[i, j]
-    X_qd_f = np.column_stack([np.ones(N), X_qd])
-    beta_mle = np.linalg.lstsq(X_qd_f, y_qd, rcond=None)[0]
-    resid_mle = y_qd - X_qd_f @ beta_mle
+            X_dm[mask, j] = X_arr[mask, j] - X_arr[mask, j].mean()
+    beta_fe = np.linalg.lstsq(X_dm, y_dm, rcond=None)[0]
+    resid_w = y_dm - X_dm @ beta_fe
+    SSR_w = float(resid_w @ resid_w)
+    df_w = N - n_groups - k
+    sigma2_e_init = SSR_w / df_w
+    resid_b = gm_y - gm_X @ beta_fe
+    SSR_b = float(resid_b @ resid_b)
+    T_bar_harm = n_groups / np.sum(1.0 / T_i)
+    sigma2_u_init = max(0.01, SSR_b / (n_groups - k - 1) - sigma2_e_init / T_bar_harm)
+
+    x0 = [np.log(sigma2_u_init), np.log(sigma2_e_init)]
+    opt = minimize(_neg_profile_loglik, x0, method='Nelder-Mead',
+                   options={'maxiter': 5000, 'xatol': 1e-10, 'fatol': 1e-10})
+
+    sigma2_u_final = np.exp(opt.x[0])
+    sigma2_e_final = np.exp(opt.x[1])
+
+    # Final GLS with optimal variance components
+    beta_mle, X_qd_full, y_qd = _gls_solution(sigma2_u_final, sigma2_e_final)
+    resid_mle = y_qd - X_qd_full @ beta_mle
     SSR = float(resid_mle @ resid_mle)
-    sigma2 = SSR / N
-    XtX_inv = np.linalg.inv(X_qd_f.T @ X_qd_f)
+    k_full = k + 1
+    df_resid = N - k_full
+    sigma2 = SSR / df_resid
+    XtX_inv = np.linalg.inv(X_qd_full.T @ X_qd_full)
     se_mle = np.sqrt(sigma2 * np.diag(XtX_inv))
     t_mle = beta_mle / se_mle
-
-    # Variance components from theta
-    sigma2_e = sigma2 * (1 - theta_opt)
-    sigma2_u = sigma2 * theta_opt / T / (1 - theta_opt) if (1 - theta_opt) > 0 else 0
+    theta_opt = 1.0 - np.sqrt(sigma2_e_final / (sigma2_e_final + np.mean(T_i) * sigma2_u_final))
 
     return {
         "df": df,
@@ -576,8 +611,8 @@ def mle_data():
         "se_oracle": se_mle,
         "t_oracle": t_mle,
         "theta": theta_opt,
-        "sigma_u": np.sqrt(max(0, sigma2_u)),
-        "sigma_e": np.sqrt(sigma2_e),
+        "sigma_u": np.sqrt(sigma2_u_final),
+        "sigma_e": np.sqrt(sigma2_e_final),
     }
 
 
@@ -663,51 +698,43 @@ def pa_data():
     k_full = 3
 
     # Oracle: GEE with exchangeable correlation
+    group_indices = [np.where(group_id == i)[0] for i in range(n_groups)]
+    T_i = np.full(n_groups, T)
     beta = np.linalg.lstsq(X_full, y, rcond=None)[0]
     for _ in range(50):
         resid = y - X_full @ beta
-        sigma2 = float(resid @ resid) / N
+        phi = float(resid @ resid) / N
         # Estimate exchangeable alpha
         num = 0.0
         den = 0.0
         for i in range(n_groups):
-            mask = group_id == i
-            ri = resid[mask]
-            Ti = ri.shape[0]
-            for a in range(Ti):
-                for b in range(a + 1, Ti):
-                    num += ri[a] * ri[b]
-                    den += 1.0
-        alpha_corr = num / den / sigma2 if den > 0 and sigma2 > 0 else 0.0
-        alpha_corr = max(-1.0 / (T - 1), min(alpha_corr, 0.999))
+            ri = resid[group_indices[i]]
+            Ti = len(ri)
+            ri_sum = ri.sum()
+            ri_sq_sum = (ri ** 2).sum()
+            num += (ri_sum ** 2 - ri_sq_sum) / 2.0
+            den += Ti * (Ti - 1) / 2.0
+        alpha_corr = num / den / phi if den > 0 and phi > 0 else 0.0
+        T_max = T_i.max()
+        alpha_corr = max(-1.0 / (T_max - 1) if T_max > 1 else 0.0,
+                         min(alpha_corr, 0.9999))
 
-        # Working correlation: R_ij = alpha for i!=j
-        # V_i = sigma2 * ((1-alpha)I + alpha 11')
-        # V_i^{-1} = 1/(sigma2*(1-alpha)) * (I - alpha/(1-alpha+T*alpha) * 11')
-        rho_inv = alpha_corr / (1 - alpha_corr + T * alpha_corr)
-        inv_factor = 1 - rho_inv * T  # diagonal element factor... let me redo
-
-        # V_i^{-1} = 1/(sigma2*(1-alpha)) * (I - rho_inv * 11')
-        # where rho_inv = alpha / ((1-alpha) + T*alpha)
-
-        # GLS: beta = (X' V^{-1} X)^{-1} X' V^{-1} y
-        Xty = np.zeros(k_full)
-        XtX = np.zeros((k_full, k_full))
+        # GEE normal equation: sum_i X_i' [I - rho_inv * J] X_i
+        H = np.zeros((k_full, k_full))
+        g = np.zeros(k_full)
         for i in range(n_groups):
-            mask = group_id == i
-            Xi = X_full[mask]
-            yi = y[mask]
-            # V_i^{-1} = 1/(s2*(1-a)) * (I - r * 11')
-            # (I - r * 11') Xi: col_j = X_ij - r * sum(X_i)
-            Xi_sum = Xi.sum(axis=0)
-            Xi_tilde = Xi - rho_inv * np.outer(np.ones(T), Xi_sum)
+            Xi = X_full[group_indices[i]]
+            yi = y[group_indices[i]]
+            Ti = len(Xi)
+            rho_inv_i = alpha_corr / (1 - alpha_corr + Ti * alpha_corr)
+            si = Xi.sum(axis=0)
             yi_sum = yi.sum()
-            yi_tilde = yi - rho_inv * yi_sum * np.ones(T)
-            XtX += Xi_tilde.T @ Xi
-            Xty += Xi_tilde.T @ yi_tilde
-        scale = 1.0 / (sigma2 * (1 - alpha_corr)) if (1 - alpha_corr) != 0 else 1.0
-        beta_new = np.linalg.solve(XtX, Xty)
-        if np.allclose(beta_new, beta, atol=1e-10):
+            H += Xi.T @ Xi - rho_inv_i * np.outer(si, si)
+            g += Xi.T @ yi - rho_inv_i * si * yi_sum
+
+        beta_new = np.linalg.solve(H, g)
+        tol = np.max(np.abs(beta_new - beta) / np.maximum(1.0, np.abs(beta)))
+        if tol <= 1e-6:
             beta = beta_new
             break
         beta = beta_new

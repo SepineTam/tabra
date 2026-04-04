@@ -33,7 +33,7 @@ class PanelModel(BaseModel):
 
         Example:
             >>> dta = load_data("nlswork")
-            >>> dta.xeset("idcode", "year")
+            >>> dta.xtset("idcode", "year")
             >>> result = PanelModel().fit(dta._df, "ln_wage", ["age", "tenure"], "idcode", model="fe")
         """
         df = self._prepare_df(df, y, x, extra_cols=[panel_var])
@@ -97,18 +97,31 @@ class PanelModel(BaseModel):
         f_stat = (SSE_w / df_model) / (SSR_w / df_resid) if df_model > 0 else 0.0
         f_pval_val = f_pval(f_stat, df_model, df_resid) if df_model > 0 else 0.0
 
-        # sigma_u: between-group variance component
+        # sigma_u: standard deviation of estimated fixed effects
         group_means_y = np.array([y_vec[groups == g].mean() for g in unique_groups])
         group_means_X = np.array([X[groups == g].mean(axis=0) for g in unique_groups])
-        X_between = np.column_stack([np.ones(n_groups), group_means_X])
-        beta_b = np.linalg.lstsq(X_between, group_means_y, rcond=None)[0]
-        resid_b = group_means_y - X_between @ beta_b
-        SSR_b = float(resid_b @ resid_b)
-        T_bar = n / n_groups
-        sigma2_u = max(0.0, SSR_b / (n_groups - k - 1) - sigma2_e / T_bar)
+        alpha_hat = group_means_y - group_means_X @ beta
+        sigma2_u = float(np.var(alpha_hat, ddof=1))
         sigma_u = np.sqrt(sigma2_u)
         sigma_e = np.sqrt(sigma2_e)
         rho = sigma2_u / (sigma2_u + sigma2_e) if (sigma2_u + sigma2_e) > 0 else 0.0
+
+        # FE _cons: average fixed effect (grand mean)
+        overall_y_mean = float(y_vec.mean())
+        overall_X_mean = X.mean(axis=0)
+        cons_fe = overall_y_mean - overall_X_mean @ beta
+        var_names = list(x) + ["_cons"]
+        beta = np.append(beta, cons_fe)
+
+        # _cons SE
+        se_cons = np.sqrt(sigma2_e / n + overall_X_mean @ var_beta @ overall_X_mean)
+        std_err = np.append(std_err, se_cons)
+        t_cons = cons_fe / se_cons
+        t_stat = np.append(t_stat, t_cons)
+        p_cons = t_pval(t_cons, df_resid)
+        p_value = np.append(p_value, p_cons)
+
+        k_vars = k + 1  # include _cons
 
         from tabra.results.panel_result import PanelResult
         return PanelResult(
@@ -116,7 +129,7 @@ class PanelModel(BaseModel):
             coef=beta, std_err=std_err, t_stat=t_stat, p_value=p_value,
             r_squared=r_squared, r_squared_adj=r_squared_adj,
             f_stat=f_stat, f_pval=f_pval_val,
-            resid=resid, fitted=fitted, n_obs=n, k_vars=k,
+            resid=resid, fitted=fitted, n_obs=n, k_vars=k_vars,
             var_names=var_names,
             SSR=SSR_w, SSE=SSE_w, SST=SST_w,
             df_model=df_model, df_resid=df_resid,
@@ -156,24 +169,29 @@ class PanelModel(BaseModel):
         beta_b = np.linalg.lstsq(X_b, gm_y, rcond=None)[0]
         resid_b = gm_y - X_b @ beta_b
         SSR_b = float(resid_b @ resid_b)
-        T_bar = n / n_groups
-        sigma2_u = max(0.0, SSR_b / (n_groups - k - 1) - sigma2_e / T_bar)
+        T_i = np.array([np.sum(groups == g) for g in unique_groups])
+        T_bar_harmonic = n_groups / np.sum(1.0 / T_i)
+        sigma2_u = max(0.0, SSR_b / (n_groups - k - 1) - sigma2_e / T_bar_harmonic)
 
-        # Step 3: Theta (Swamy-Arora)
-        theta = 1.0 - np.sqrt(sigma2_e / (sigma2_e + T_bar * sigma2_u))
+        # Step 3: Theta (Swamy-Arora) — per-group for unbalanced panels
+        theta_i = 1.0 - np.sqrt(sigma2_e / (sigma2_e + T_i * sigma2_u))
 
-        # Step 4: Quasi-demeaned data
+        # Step 4: Quasi-demeaned data (per-group theta)
         y_qd = np.zeros(n)
         X_qd = np.zeros((n, k))
         for i, g in enumerate(unique_groups):
             mask = groups == g
-            y_qd[mask] = y_vec[mask] - theta * gm_y[i]
+            y_qd[mask] = y_vec[mask] - theta_i[i] * gm_y[i]
             for j in range(k):
-                X_qd[mask, j] = X[mask, j] - theta * gm_X[i, j]
+                X_qd[mask, j] = X[mask, j] - theta_i[i] * gm_X[i, j]
 
         if is_con:
-            X_qd_full = np.column_stack([np.ones(n), X_qd])
-            var_names = var_names + ["_cons"]
+            ones_qd = np.zeros(n)
+            for i, g in enumerate(unique_groups):
+                mask = groups == g
+                ones_qd[mask] = 1.0 - theta_i[i]
+            X_qd_full = np.column_stack([ones_qd, X_qd])
+            var_names = ["_cons"] + var_names
         else:
             X_qd_full = X_qd
 
@@ -202,6 +220,15 @@ class PanelModel(BaseModel):
         f_stat = (SSE_re / df_model) / (SSR_re / df_resid) if df_model > 0 else 0.0
         f_pval_val = f_pval(f_stat, df_model, df_resid) if df_model > 0 else 0.0
 
+        # Wald chi2 (slopes only, full covariance matrix)
+        if is_con:
+            beta_slopes = beta[1:]
+            V_slopes = var_beta[1:, 1:]
+        else:
+            beta_slopes = beta
+            V_slopes = var_beta
+        wald_chi2 = float(beta_slopes @ np.linalg.inv(V_slopes) @ beta_slopes) if k > 0 else 0.0
+
         sigma_u = np.sqrt(sigma2_u)
         sigma_e = np.sqrt(sigma2_e)
         rho = sigma2_u / (sigma2_u + sigma2_e) if (sigma2_u + sigma2_e) > 0 else 0.0
@@ -218,11 +245,13 @@ class PanelModel(BaseModel):
             df_model=df_model, df_resid=df_resid,
             mse=sigma2_re, root_mse=np.sqrt(sigma2_re),
             sigma_u=sigma_u, sigma_e=sigma_e, rho=rho,
-            y_name=y, theta=theta,
+            y_name=y, theta=theta_i.mean(), n_groups=n_groups,
+            chi2_stat=wald_chi2, chi2_label=f"Wald chi2({k})",
         )
 
     def _fit_be(self, df, y, x, panel_var, is_con=True):
         y_vec = df[y].values.astype(float)
+        n = len(y_vec)
         X = df[x].values.astype(float)
         var_names = list(x)
         groups = df[panel_var].values
@@ -236,7 +265,7 @@ class PanelModel(BaseModel):
         # OLS on group means
         if is_con:
             X_b = np.column_stack([np.ones(n_groups), gm_X])
-            var_names = var_names + ["_cons"]
+            var_names = ["_cons"] + var_names
         else:
             X_b = gm_X
 
@@ -272,7 +301,7 @@ class PanelModel(BaseModel):
             coef=beta, std_err=std_err, t_stat=t_stat, p_value=p_value,
             r_squared=r_squared, r_squared_adj=r_squared_adj,
             f_stat=f_stat, f_pval=f_pval_val,
-            resid=resid_b, fitted=X_b @ beta, n_obs=n_groups, k_vars=k_b,
+            resid=resid_b, fitted=X_b @ beta, n_obs=n, k_vars=k_b,
             var_names=var_names,
             SSR=SSR_b, SSE=SSE_b, SST=SST_b,
             df_model=df_model, df_resid=df_resid,
@@ -282,7 +311,7 @@ class PanelModel(BaseModel):
         )
 
     def _fit_mle(self, df, y, x, panel_var, is_con=True):
-        from scipy.optimize import minimize_scalar
+        from scipy.optimize import minimize
 
         y_vec = df[y].values.astype(float)
         X = df[x].values.astype(float)
@@ -291,55 +320,128 @@ class PanelModel(BaseModel):
         unique_groups = np.unique(groups)
         n_groups = len(unique_groups)
         n, k = X.shape
-        T_bar = n / n_groups
 
+        # Pre-compute per-group data
+        T_i = np.array([np.sum(groups == g) for g in unique_groups])
         gm_y = np.array([y_vec[groups == g].mean() for g in unique_groups])
         gm_X = np.array([X[groups == g].mean(axis=0) for g in unique_groups])
 
-        def _neg_cloglik(theta):
-            if theta <= 0 or theta >= 1:
-                return 1e20
+        # Build index arrays for fast group access
+        group_indices = []
+        for g in unique_groups:
+            group_indices.append(np.where(groups == g)[0])
+
+        def _gls_solution(sigma2_u_val, sigma2_e_val):
+            """Given variance components, compute GLS estimator."""
+            phi_i = sigma2_u_val / (sigma2_e_val + T_i * sigma2_u_val)
+            theta_i = 1.0 - np.sqrt(sigma2_e_val / (sigma2_e_val + T_i * sigma2_u_val))
+
+            # Quasi-demean
             y_qd = np.zeros(n)
             X_qd = np.zeros((n, k))
-            for i, g in enumerate(unique_groups):
-                mask = groups == g
-                y_qd[mask] = y_vec[mask] - theta * gm_y[i]
+            for idx in range(n_groups):
+                gi = group_indices[idx]
+                y_qd[gi] = y_vec[gi] - theta_i[idx] * gm_y[idx]
                 for j in range(k):
-                    X_qd[mask, j] = X[mask, j] - theta * gm_X[i, j]
-            X_qd_f = np.column_stack([np.ones(n), X_qd])
-            beta = np.linalg.lstsq(X_qd_f, y_qd, rcond=None)[0]
-            resid = y_qd - X_qd_f @ beta
-            sigma2 = float(resid @ resid) / n
-            return n / 2 * np.log(sigma2) - n_groups / 2 * np.log(1 - theta)
+                    X_qd[gi, j] = X[gi, j] - theta_i[idx] * gm_X[idx, j]
 
-        res = minimize_scalar(_neg_cloglik, bounds=(1e-6, 1 - 1e-6), method="bounded")
-        theta = res.x
+            if is_con:
+                ones_qd = np.zeros(n)
+                for idx in range(n_groups):
+                    gi = group_indices[idx]
+                    ones_qd[gi] = 1.0 - theta_i[idx]
+                X_qd_full = np.column_stack([ones_qd, X_qd])
+            else:
+                X_qd_full = X_qd
 
-        # GLS with optimal theta
-        y_qd = np.zeros(n)
-        X_qd = np.zeros((n, k))
-        for i, g in enumerate(unique_groups):
+            beta = np.linalg.lstsq(X_qd_full, y_qd, rcond=None)[0]
+            return beta, X_qd_full, y_qd
+
+        def _neg_profile_loglik(params):
+            """Negative profile log-likelihood for RE MLE.
+
+            Reference: Baltagi (2021), Econometric Analysis of Panel Data, Ch. 3.
+            """
+            log_su, log_se = params
+            sigma2_u_val = np.exp(log_su)
+            sigma2_e_val = np.exp(log_se)
+
+            if sigma2_u_val < 1e-20 or sigma2_e_val < 1e-20:
+                return 1e20
+
+            beta, _, _ = _gls_solution(sigma2_u_val, sigma2_e_val)
+
+            total_loglik = 0.0
+            for idx in range(n_groups):
+                gi = group_indices[idx]
+                Ti = T_i[idx]
+                yi = y_vec[gi]
+                if is_con:
+                    Xi = np.column_stack([np.ones(Ti), X[gi]])
+                else:
+                    Xi = X[gi]
+
+                resid_i = yi - Xi @ beta
+
+                log_det = (Ti - 1) * np.log(sigma2_e_val) + np.log(sigma2_e_val + Ti * sigma2_u_val)
+
+                phi_i = sigma2_u_val / (sigma2_e_val + Ti * sigma2_u_val)
+                resid_sum = resid_i.sum()
+                quad_form = (resid_i @ resid_i - phi_i * resid_sum**2) / sigma2_e_val
+
+                log_lik_i = -Ti / 2 * np.log(2 * np.pi) - 0.5 * log_det - 0.5 * quad_form
+                total_loglik += log_lik_i
+
+            return -total_loglik
+
+        # Initial values from Swamy-Arora
+        y_dm = np.zeros(n)
+        X_dm = np.zeros((n, k))
+        for g_idx, g in enumerate(unique_groups):
             mask = groups == g
-            y_qd[mask] = y_vec[mask] - theta * gm_y[i]
+            y_dm[mask] = y_vec[mask] - y_vec[mask].mean()
             for j in range(k):
-                X_qd[mask, j] = X[mask, j] - theta * gm_X[i, j]
+                X_dm[mask, j] = X[mask, j] - X[mask, j].mean()
+        beta_fe = np.linalg.lstsq(X_dm, y_dm, rcond=None)[0]
+        resid_w = y_dm - X_dm @ beta_fe
+        SSR_w = float(resid_w @ resid_w)
+        df_w = n - n_groups - k
+        sigma2_e_init = SSR_w / df_w
+
+        resid_b = gm_y - gm_X @ beta_fe
+        SSR_b = float(resid_b @ resid_b)
+        T_bar_harmonic = n_groups / np.sum(1.0 / T_i)
+        sigma2_u_init = max(0.01, SSR_b / (n_groups - k - 1) - sigma2_e_init / T_bar_harmonic)
+
+        x0 = [np.log(sigma2_u_init), np.log(sigma2_e_init)]
+        result = minimize(_neg_profile_loglik, x0, method='Nelder-Mead',
+                          options={'maxiter': 5000, 'xatol': 1e-10, 'fatol': 1e-10})
+        # Powell refinement for higher precision
+        result = minimize(_neg_profile_loglik, result.x, method='Powell',
+                          options={'maxiter': 10000, 'ftol': 1e-15, 'xtol': 1e-15})
+
+        sigma2_u_final = np.exp(result.x[0])
+        sigma2_e_final = np.exp(result.x[1])
+        sigma_u = np.sqrt(sigma2_u_final)
+        sigma_e = np.sqrt(sigma2_e_final)
+        rho = sigma2_u_final / (sigma2_u_final + sigma2_e_final)
+
+        # Final GLS with optimal variance components
+        beta_final, X_qd_full, y_qd = _gls_solution(sigma2_u_final, sigma2_e_final)
 
         if is_con:
-            X_qd_f = np.column_stack([np.ones(n), X_qd])
-            var_names = var_names + ["_cons"]
-        else:
-            X_qd_f = X_qd
+            var_names = ["_cons"] + var_names
 
-        n_qd, k_qd = X_qd_f.shape
-        XtX = mat_mul(mat_transpose(X_qd_f), X_qd_f)
-        Xty = mat_mul(mat_transpose(X_qd_f), y_qd.reshape(-1, 1))
+        n_qd, k_qd = X_qd_full.shape
+        XtX = mat_mul(mat_transpose(X_qd_full), X_qd_full)
+        Xty = mat_mul(mat_transpose(X_qd_full), y_qd.reshape(-1, 1))
         XtX_inv = mat_inv(XtX)
         beta = mat_mul(XtX_inv, Xty).flatten()
 
-        resid_mle = y_qd - X_qd_f @ beta
+        resid_mle = y_qd - X_qd_full @ beta
         SSR = float(resid_mle @ resid_mle)
-        sigma2 = SSR / n
         df_resid = n_qd - k_qd
+        sigma2 = SSR / df_resid
         var_beta = sigma2 * XtX_inv
         std_err = np.sqrt(np.diag(var_beta))
         t_stat = beta / std_err
@@ -355,11 +457,39 @@ class PanelModel(BaseModel):
         f_stat = (SSE / df_model) / (SSR / df_resid) if df_model > 0 else 0.0
         f_pval_val = f_pval(f_stat, df_model, df_resid) if df_model > 0 else 0.0
 
-        sigma2_e = sigma2 * (1 - theta)
-        sigma2_u = sigma2 * theta / T_bar / (1 - theta) if (1 - theta) > 0 else 0.0
-        sigma_u = np.sqrt(max(0, sigma2_u))
-        sigma_e = np.sqrt(sigma2_e)
-        rho = sigma2_u / (sigma2_u + sigma2_e) if (sigma2_u + sigma2_e) > 0 else 0.0
+        # Log-likelihood for full model
+        ll_full = -result.fun  # result.fun = neg_profile_loglik at optimum
+
+        # Restricted model: intercept-only RE MLE
+        # Stata optimizes mu as a free parameter alongside variance components
+        y_mean_global = float(y_vec.mean())
+
+        def _neg_loglik_restricted(params_r):
+            log_su, log_se, mu = params_r
+            s2u = np.exp(log_su)
+            s2e = np.exp(log_se)
+            if s2u < 1e-20 or s2e < 1e-20:
+                return 1e20
+            total_ll = 0.0
+            for idx in range(n_groups):
+                gi = group_indices[idx]
+                Ti = T_i[idx]
+                yi = y_vec[gi]
+                resid_i = yi - mu
+                log_det = (Ti - 1) * np.log(s2e) + np.log(s2e + Ti * s2u)
+                phi_i = s2u / (s2e + Ti * s2u)
+                resid_sum = resid_i.sum()
+                quad = (resid_i @ resid_i - phi_i * resid_sum ** 2) / s2e
+                total_ll += -Ti / 2 * np.log(2 * np.pi) - 0.5 * log_det - 0.5 * quad
+            return -total_ll
+
+        x0_r = [np.log(sigma2_u_final), np.log(sigma2_e_final), y_mean_global]
+        result_r = minimize(_neg_loglik_restricted, x0_r, method='Nelder-Mead',
+                            options={'maxiter': 10000, 'xatol': 1e-12, 'fatol': 1e-12})
+        result_r = minimize(_neg_loglik_restricted, result_r.x, method='Powell',
+                            options={'maxiter': 10000, 'ftol': 1e-15, 'xtol': 1e-15})
+        ll_restricted = -result_r.fun
+        lr_chi2 = max(0.0, -2.0 * (ll_restricted - ll_full))
 
         from tabra.results.panel_result import PanelResult
         return PanelResult(
@@ -367,13 +497,16 @@ class PanelModel(BaseModel):
             coef=beta, std_err=std_err, t_stat=t_stat, p_value=p_value,
             r_squared=r_squared, r_squared_adj=r_squared_adj,
             f_stat=f_stat, f_pval=f_pval_val,
-            resid=resid_mle, fitted=X_qd_f @ beta, n_obs=n, k_vars=k_qd,
+            resid=resid_mle, fitted=X_qd_full @ beta, n_obs=n, k_vars=k_qd,
             var_names=var_names,
             SSR=SSR, SSE=SSE, SST=SST,
             df_model=df_model, df_resid=df_resid,
             mse=sigma2, root_mse=np.sqrt(sigma2),
             sigma_u=sigma_u, sigma_e=sigma_e, rho=rho,
-            y_name=y, theta=theta,
+            y_name=y, theta=1.0 - np.sqrt(sigma2_e_final / (sigma2_e_final + np.mean(T_i) * sigma2_u_final)),
+            n_groups=n_groups,
+            chi2_stat=lr_chi2, chi2_label=f"LR chi2({k})",
+            ll=ll_full,
         )
 
     def _fit_pa(self, df, y, x, panel_var, is_con=True):
@@ -387,58 +520,73 @@ class PanelModel(BaseModel):
 
         if is_con:
             X_full = np.column_stack([np.ones(n), X])
-            var_names = var_names + ["_cons"]
+            var_names = ["_cons"] + var_names
         else:
             X_full = X
 
         k_full = X_full.shape[1]
+        T_i = np.array([np.sum(groups == g) for g in unique_groups])
 
-        # Get T per group
-        T_arr = np.array([np.sum(groups == g) for g in unique_groups])
+        # Build index arrays
+        group_indices = []
+        for g in unique_groups:
+            group_indices.append(np.where(groups == g)[0])
 
         # Initial OLS
         beta = np.linalg.lstsq(X_full, y_vec, rcond=None)[0]
 
-        for _ in range(100):
+        for iteration in range(500):
             resid = y_vec - X_full @ beta
-            sigma2 = float(resid @ resid) / n
+            phi = float(resid @ resid) / n
 
-            # Estimate exchangeable alpha
+            if phi <= 0:
+                break
+
+            # Estimate exchangeable correlation alpha (vectorized)
             num = 0.0
             den = 0.0
-            for i, g in enumerate(unique_groups):
-                mask = groups == g
-                ri = resid[mask]
-                Ti = ri.shape[0]
-                for a in range(Ti):
-                    for b in range(a + 1, Ti):
-                        num += ri[a] * ri[b]
-                        den += 1.0
-            alpha_corr = num / den / sigma2 if den > 0 and sigma2 > 0 else 0.0
-            alpha_corr = max(-1.0 / (max(T_arr) - 1), min(alpha_corr, 0.999))
+            for idx in range(n_groups):
+                gi = group_indices[idx]
+                ri = resid[gi]
+                Ti = len(gi)
+                ri_sum = ri.sum()
+                ri_sq_sum = (ri ** 2).sum()
+                num += (ri_sum ** 2 - ri_sq_sum) / 2.0
+                den += Ti * (Ti - 1) / 2.0
 
-            # GLS update
-            rho_inv = alpha_corr / (1 - alpha_corr + T_arr.mean() * alpha_corr)
-            XtX = np.zeros((k_full, k_full))
-            Xty = np.zeros(k_full)
-            for i, g in enumerate(unique_groups):
-                mask = groups == g
-                Xi = X_full[mask]
-                yi = y_vec[mask]
-                Ti = mask.sum()
-                Xi_sum = Xi.sum(axis=0)
-                Xi_tilde = Xi - rho_inv * np.outer(np.ones(Ti), Xi_sum)
-                yi_sum = yi.sum()
-                yi_tilde = yi - rho_inv * yi_sum * np.ones(Ti)
-                XtX += Xi_tilde.T @ Xi
-                Xty += Xi_tilde.T @ yi_tilde
-            beta_new = np.linalg.solve(XtX, Xty)
-            if np.allclose(beta_new, beta, atol=1e-10):
+            alpha_corr = num / den / phi if den > 0 and phi > 0 else 0.0
+            T_max = T_i.max()
+            alpha_corr = max(-1.0 / (T_max - 1) if T_max > 1 else 0.0,
+                             min(alpha_corr, 0.9999))
+
+            # GEE update: correct normal equation
+            # sum_i X_i' [I - rho_inv * J] X_i and X_i' [I - rho_inv * J] y_i
+            H = np.zeros((k_full, k_full))
+            g = np.zeros(k_full)
+            for idx in range(n_groups):
+                gi = group_indices[idx]
+                Xi = X_full[gi]
+                yi = y_vec[gi]
+                Ti = len(gi)
+
+                rho_inv_i = alpha_corr / (1 - alpha_corr + Ti * alpha_corr)
+
+                XiX = Xi.T @ Xi
+                Xiy = Xi.T @ yi
+                si = Xi.sum(axis=0)  # column sums = X'1
+                yi_sum = yi.sum()    # 1'y
+
+                H += XiX - rho_inv_i * np.outer(si, si)
+                g += Xiy - rho_inv_i * si * yi_sum
+
+            beta_new = np.linalg.solve(H, g)
+            tol = np.max(np.abs(beta_new - beta) / np.maximum(1.0, np.abs(beta)))
+            if tol <= 1e-10:
                 beta = beta_new
                 break
             beta = beta_new
 
-        # Final stats on quasi-demeaned scale
+        # Final statistics
         resid_final = y_vec - X_full @ beta
         sigma2_final = float(resid_final @ resid_final) / n
 
@@ -453,13 +601,21 @@ class PanelModel(BaseModel):
         f_stat = (SSE / df_model) / (SSR / df_resid) if df_model > 0 else 0.0
         f_pval_val = f_pval(f_stat, df_model, df_resid) if df_model > 0 else 0.0
 
-        # Robust SE: sandwich estimator approach for PA
-        # For simplicity, use OLS-like SE on the full data
-        XtX_full = X_full.T @ X_full
-        XtX_inv_full = np.linalg.inv(XtX_full)
-        std_err = np.sqrt(sigma2_final * np.diag(XtX_inv_full))
+        # SE from GEE normal equation (H = sum X_i'[I-rho_inv*J]X_i)
+        H_inv = np.linalg.inv(H)
+        V_beta = sigma2_final * (1 - alpha_corr) * H_inv
+        std_err = np.sqrt(np.diag(V_beta))
         t_stat = beta / std_err
         p_value = np.array([t_pval(t, df_resid) for t in t_stat])
+
+        # Wald chi2 (slopes only, full covariance matrix)
+        if is_con:
+            beta_slopes = beta[1:]
+            V_slopes = V_beta[1:, 1:]
+        else:
+            beta_slopes = beta
+            V_slopes = V_beta
+        wald_chi2 = float(beta_slopes @ np.linalg.inv(V_slopes) @ beta_slopes) if k > 0 else 0.0
 
         from tabra.results.panel_result import PanelResult
         return PanelResult(
@@ -474,6 +630,7 @@ class PanelModel(BaseModel):
             mse=sigma2_final, root_mse=np.sqrt(sigma2_final),
             sigma_u=None, sigma_e=None, rho=None,
             y_name=y, n_groups=n_groups,
+            chi2_stat=wald_chi2, chi2_label=f"Wald chi2({k})",
         )
 
     def estimate(self, df, x, **kwargs):
