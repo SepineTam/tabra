@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(commit-commands:commit)",
+      "Skill(learn-stata-command)",
+      "Skill(verify-command)",
+      "Skill(fix-from-report)",
+      "Skill(intuitive-test)",
+      "Bash(codex:*)",
+      "Bash(stata-mcp --version)",
+      "Bash(stata-mcp --help)",
+      "Bash(stata-mcp tool --help)",
+      "Bash(stata-mcp tool help:*)",
+      "Bash(stata-mcp tool do:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "Bash(git pull)",
+      "Bash(git push)",
+      "Bash(uv tool install *)",
+      "Bash(uv sync)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Bash(cat ~/.zshrc)",
+      "Bash(git push --force)"
+    ],
+    "ask": [
+      "Bash(rm:*)"
+    ]
+  },
+  "enabledPlugins": {
+    "planning-with-files@planning-with-files": true,
+    "superpowers@claude-plugins-official": true
+  }
+}
