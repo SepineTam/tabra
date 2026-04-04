@@ -385,7 +385,7 @@ class DataOps:
             >>> tab.data.reshape_long("wage", i="firm", j="year")
             >>> tab.data.reshape_long(["wage", "hours"], i="firm")
         """
-        stubs = self._resolve_vars(stub)
+        stubs = self._parse_vars(stub)
         df = self._tabra._df
 
         if i not in df.columns:
@@ -432,7 +432,7 @@ class DataOps:
             >>> tab.data.reshape_wide("wage", i="firm", j="year")
             >>> tab.data.reshape_wide(["wage", "hours"], i="firm", j="year")
         """
-        stubs = self._resolve_vars(stub)
+        stubs = self._parse_vars(stub)
         df = self._tabra._df
 
         if i not in df.columns:
@@ -973,6 +973,109 @@ class DataOps:
         import re
         return [c for c in self._tabra._df.columns if re.search(pattern, c)]
 
+    def corr(
+        self,
+        var_list: list[str] | str = None,
+        *,
+        method: str = "pearson",
+    ):
+        """Compute correlation matrix (Stata correlate / pwcorr).
+
+        Args:
+            var_list (str or list, optional): Variable name(s) or regex.
+                None uses all numeric columns. Default None.
+            method (str): Correlation method. One of "pearson",
+                "spearman", "kendall". Default "pearson".
+
+        Returns:
+            CorrResult: Result object with matrix, var_names, method, n_obs.
+
+        Example:
+            >>> dta.data.corr(["price", "mpg", "weight"])
+            >>> dta.data.corr("^price|^mpg", method="spearman")
+        """
+        from tabra.results.corr_result import CorrResult
+
+        df = self._tabra._df
+
+        if var_list is not None:
+            cols = self._resolve_vars(var_list)
+        else:
+            cols = (df.select_dtypes(include=["number", "category"])
+                     .columns.tolist())
+
+        sub = df[cols].copy()
+        for c in sub.select_dtypes(include="category").columns:
+            sub[c] = sub[c].cat.codes.astype(float)
+            sub.loc[sub[c] == -1, c] = np.nan
+        sub = sub.dropna()
+        n_obs = len(sub)
+
+        corr_matrix = sub.corr(method=method).values
+
+        result = CorrResult(
+            matrix=corr_matrix,
+            var_names=cols,
+            method=method,
+            n_obs=n_obs,
+        )
+        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
+        self._tabra._result = result
+
+        if getattr(self._tabra, '_is_display_result', True):
+            print(result.summary())
+
+        return result
+
+    def cov(
+        self,
+        var_list: list[str] | str = None,
+    ):
+        """Compute covariance matrix (Stata correlate, covariance).
+
+        Args:
+            var_list (str or list, optional): Variable name(s) or regex.
+                None uses all numeric columns. Default None.
+
+        Returns:
+            CovResult: Result object with matrix, var_names, n_obs.
+
+        Example:
+            >>> dta.data.cov(["price", "mpg", "weight"])
+            >>> dta.data.cov()
+        """
+        from tabra.results.cov_result import CovResult
+
+        df = self._tabra._df
+
+        if var_list is not None:
+            cols = self._resolve_vars(var_list)
+        else:
+            cols = (df.select_dtypes(include=["number", "category"])
+                     .columns.tolist())
+
+        sub = df[cols].copy()
+        for c in sub.select_dtypes(include="category").columns:
+            sub[c] = sub[c].cat.codes.astype(float)
+            sub.loc[sub[c] == -1, c] = np.nan
+        sub = sub.dropna()
+        n_obs = len(sub)
+
+        cov_matrix = sub.cov().values
+
+        result = CovResult(
+            matrix=cov_matrix,
+            var_names=cols,
+            n_obs=n_obs,
+        )
+        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
+        self._tabra._result = result
+
+        if getattr(self._tabra, '_is_display_result', True):
+            print(result.summary())
+
+        return result
+
     def describe(self, vars: list[str] | str = None):
         """Print variable overview (Stata describe).
 
@@ -1063,9 +1166,131 @@ class DataOps:
             print(f"{'Total':>{len(var)}} | {total:>5}   100.00")
         else:
             # --- two-way crosstab ---
+            from tabra.results.crosstab_result import CrosstabResult
+
             if by not in df.columns:
                 raise KeyError(f"Variable '{by}' not found in DataFrame")
-            ct = pd.crosstab(df[var], df[by], margins=True, dropna=False)
-            print(ct.to_string())
+            ct = pd.crosstab(df[var], df[by], dropna=False)
+            row_labels = [str(v) for v in ct.index]
+            col_labels = [str(v) for v in ct.columns]
+            matrix = ct.values.astype(float)
+            row_totals = matrix.sum(axis=1)
+            col_totals = matrix.sum(axis=0)
+            grand_total = int(matrix.sum())
 
-        return self
+            result = CrosstabResult(
+                matrix=matrix,
+                row_labels=row_labels,
+                col_labels=col_labels,
+                row_var=var,
+                col_var=by,
+                row_totals=row_totals,
+                col_totals=col_totals,
+                grand_total=grand_total,
+            )
+            result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
+            self._tabra._result = result
+
+            if getattr(self._tabra, '_is_display_result', True):
+                print(result.summary())
+
+            return result
+
+    def xttrans(
+        self,
+        var: str,
+        *,
+        id: str = None,
+        time: str = None,
+    ):
+        """Compute transition probability matrix (Stata xttrans).
+
+        Requires panel settings from ``xeset()`` unless ``id`` and ``time``
+        are passed explicitly.
+
+        Args:
+            var (str): State variable to compute transitions for.
+            id (str, optional): Panel identifier. Defaults to xeset value.
+            time (str, optional): Time variable. Defaults to xeset value.
+
+        Returns:
+            XttransResult: Result with count_matrix, prob_matrix, state_labels.
+
+        Example:
+            >>> dta.xeset("idcode", "year")
+            >>> dta.data.xttrans("status")
+        """
+        from tabra.results.xttrans_result import XttransResult
+
+        df = self._tabra._df
+        if var not in df.columns:
+            raise KeyError(f"Variable '{var}' not found in DataFrame")
+
+        # Resolve id and time from xeset if not provided
+        id_var = id or getattr(self._tabra, '_panel_var', None)
+        time_var = time or getattr(self._tabra, '_time_var', None)
+
+        if id_var is None:
+            raise ValueError(
+                "Panel id not set. Call dta.xeset() first, "
+                "or pass id= and time= explicitly."
+            )
+        if time_var is None:
+            raise ValueError(
+                "Time variable not set. Call dta.xeset() first, "
+                "or pass id= and time= explicitly."
+            )
+
+        for v in [id_var, time_var]:
+            if v not in df.columns:
+                raise KeyError(f"Variable '{v}' not found in DataFrame")
+
+        # Sort by (id, time) and generate lag within each id group
+        df_sorted = df[[id_var, time_var, var]].copy()
+        df_sorted = df_sorted.sort_values([id_var, time_var])
+        df_sorted['_lag'] = df_sorted.groupby(id_var)[var].shift(1)
+
+        # Detect minimum time step and drop rows where gap != step
+        df_sorted['_gap'] = df_sorted.groupby(id_var)[time_var].diff()
+        min_step = df_sorted['_gap'].dropna().min()
+        if pd.notna(min_step):
+            valid = df_sorted['_gap'].eq(min_step) & df_sorted['_lag'].notna()
+        else:
+            valid = df_sorted['_lag'].notna()
+
+        transitions = df_sorted.loc[valid, ['_lag', var]].dropna()
+
+        if transitions.empty:
+            raise ValueError("No valid transitions found in the data")
+
+        # Build count matrix via crosstab
+        ct = pd.crosstab(transitions['_lag'], transitions[var])
+        all_states = sorted(set(ct.index.tolist() + ct.columns.tolist()))
+
+        # Ensure square matrix with consistent order
+        ct = ct.reindex(index=all_states, columns=all_states, fill_value=0)
+        count_matrix = ct.values.astype(float)
+
+        # Row-normalize to get probabilities
+        row_sums = count_matrix.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1  # avoid division by zero
+        prob_matrix = count_matrix / row_sums
+
+        state_labels = [str(s) for s in all_states]
+        n_transitions = int(count_matrix.sum())
+
+        result = XttransResult(
+            count_matrix=count_matrix,
+            prob_matrix=prob_matrix,
+            state_labels=state_labels,
+            var=var,
+            n_obs=len(df_sorted),
+            n_transitions=n_transitions,
+        )
+        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
+        self._tabra._result = result
+
+        if getattr(self._tabra, '_is_display_result', True):
+            print(result.summary())
+
+        return result
