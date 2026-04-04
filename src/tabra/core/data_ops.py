@@ -912,3 +912,58 @@ class DataOps:
 
         self._tabra._df[target] = result
         return self
+
+    def list_var(self) -> list[str]:
+        """Return all variable (column) names in the DataFrame.
+
+        Returns:
+            list[str]: List of column names.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> dta.data.list_var()
+            ['make', 'price', 'mpg', 'rep78', 'headroom', 'trunk', 'weight', 'length', 'turn', 'displacement', 'gear_ratio', 'foreign']
+        """
+        return self._tabra._df.columns.tolist()
+
+    def head(self, vars=None, lines: int = 5):
+        """Print the first N rows of selected variables.
+
+        Args:
+            vars (str or list, optional): Variable name(s) to display.
+                None displays all columns. Default None.
+            lines (int): Number of rows to print. Default 5.
+
+        Returns:
+            DataOps: Returns self for method chaining.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> dta.data.head("price mpg", lines=3)
+            >>> dta.data.head(lines=10)
+        """
+        df = self._tabra._df
+        if vars is not None:
+            vars_list = self._parse_vars(vars)
+            df = df[vars_list]
+        print(df.head(lines).to_string())
+        return self
+
+    def search(self, pattern: str) -> list[str]:
+        """Search variable names by regex pattern.
+
+        Args:
+            pattern (str): Regular expression pattern to match against
+                column names.
+
+        Returns:
+            list[str]: List of matching column names.
+
+        Example:
+            >>> dta.data.search("^year")
+            ['year', 'year_birth']
+            >>> dta.data.search("price|wage")
+            ['price', 'wage']
+        """
+        import re
+        return [c for c in self._tabra._df.columns if re.search(pattern, c)]
