@@ -540,6 +540,97 @@ class PlotOps:
             result = self._tabra._result
         return plot_coefplot(result, **kwargs)
 
+    def kdensity(self, var, by: str = None,
+                 bw=None, kernel: str = "gaussian",
+                 title: str = None, xtitle: str = None, ytitle: str = None,
+                 template=None, fig_setting=None):
+        """Draw a kernel density estimation plot.
+
+        Args:
+            var (str | list[str]): Variable name(s) to plot.
+            by (str): Grouping variable. If None, draws without grouping.
+            bw (float): Bandwidth. None = auto (Silverman's rule).
+            kernel (str): Kernel type. Default 'gaussian'.
+            title (str): Plot title.
+            xtitle (str): X-axis label.
+            ytitle (str): Y-axis label. Defaults to "Density".
+            template (PlotTemplateBase): Plot template to use.
+            fig_setting: Reserved for compatibility. Ignored.
+
+        Returns:
+            TabraFigure: A wrapped figure object.
+        """
+        from scipy.stats import gaussian_kde
+
+        template = template or self._tabra._config.plot_template
+        template.apply()
+
+        vars_list = [var] if isinstance(var, str) else var
+
+        # Collect all combinations of (var, group)
+        plot_specs = []
+        if by is not None:
+            groups = self._df[by].dropna().unique()
+            for v in vars_list:
+                for g in groups:
+                    plot_specs.append((v, g))
+        else:
+            for v in vars_list:
+                plot_specs.append((v, None))
+
+        n_plots = len(plot_specs)
+        n_cols = min(n_plots, 3)
+        n_rows = (n_plots + n_cols - 1) // n_cols
+
+        fig, axes = plt.subplots(
+            n_rows, n_cols,
+            figsize=(template.fig_width * n_cols, template.fig_height * n_rows),
+            dpi=template.dpi,
+            squeeze=False,
+        )
+        if n_plots == 1:
+            axes = np.array([axes])
+        axes_flat = axes.flatten()
+
+        colors = list(template.color_cycle)
+
+        for idx, (v, group) in enumerate(plot_specs):
+            ax = axes_flat[idx]
+            if by is not None and group is not None:
+                data = self._df.loc[self._df[by] == group, v].dropna().values
+            else:
+                data = self._df[v].dropna().values
+
+            kde = gaussian_kde(data, bw_method=bw)
+            x_grid = np.linspace(data.min(), data.max(), 200)
+            density = kde(x_grid)
+
+            color = colors[idx % len(colors)]
+            ax.plot(x_grid, density, color=color, linewidth=template.line_width)
+            ax.fill_between(x_grid, density, alpha=0.2, color=color)
+
+            xlabel = xtitle if xtitle is not None else v
+            ylabel = ytitle if ytitle is not None else "Density"
+            ax.set_xlabel(xlabel, fontsize=template.label_size)
+            ax.set_ylabel(ylabel, fontsize=template.label_size)
+
+            if by is not None and group is not None:
+                ax.set_title(f"{v} | {by}={group}", fontsize=template.title_size)
+            elif title is not None and n_plots == 1:
+                ax.set_title(title, fontsize=template.title_size)
+
+            if not template.spine_top:
+                ax.spines["top"].set_visible(False)
+            if not template.spine_right:
+                ax.spines["right"].set_visible(False)
+
+        # Hide unused axes
+        for idx in range(n_plots, len(axes_flat)):
+            axes_flat[idx].set_visible(False)
+
+        fig.tight_layout()
+        return TabraFigure(fig, tabra=self._tabra)
+
 # ---- Module-level global settings ----
 
 _global_plot_template = None

@@ -28,3 +28,4 @@ class PlotKind(Enum):
     lfit = "lfit"
     lfitci = "lfitci"
     coefplot = "coefplot"
+    kdensity = "kdensity"
