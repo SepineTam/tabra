@@ -1,16 +1,19 @@
 [project]
 name = "tabra"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tabra is a Python toolkit for empirical research workflows, designed for data processing, model estimation, result export, and reproducible analysis."
 readme = "README.md"
 authors = [
     { name = "SongTan", email = "sepinetam@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "matplotlib>=3.10.8",
     "numpy>=2.4.3",
     "pandas>=3.0.1",
     "scipy>=1.17.1",
+    "seaborn>=0.13.2",
+    "statsmodels>=0.14.6",
 ]
 
 [project.scripts]
@@ -23,3 +26,8 @@ pythonpath = ["src"]
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
