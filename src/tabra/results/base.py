@@ -29,3 +29,15 @@ class BaseResult(ABC):
 
     @abstractmethod
     def save(self, path): ...
+
+    def coefplot(self, **kwargs):
+        """Create a coefficient plot from this result.
+
+        Args:
+            **kwargs: Passed to tabra.plot.coefplot.plot_coefplot().
+
+        Returns:
+            TabraFigure: Wrapped matplotlib figure.
+        """
+        from tabra.plot.coefplot import plot_coefplot
+        return plot_coefplot(self, **kwargs)

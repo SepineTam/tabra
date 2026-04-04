@@ -525,6 +525,21 @@ class PlotOps:
         self._apply_template(template, ax)
         return TabraFigure(fig, tabra=self._tabra)
 
+    def coefplot(self, result=None, **kwargs):
+        """Plot regression coefficients with confidence intervals.
+
+        Args:
+            result: Result object, list of results, or None (uses latest).
+            **kwargs: Passed to coefplot.plot_coefplot().
+
+        Returns:
+            TabraFigure: Wrapped matplotlib figure.
+        """
+        from tabra.plot.coefplot import plot_coefplot
+        if result is None:
+            result = self._tabra._result
+        return plot_coefplot(result, **kwargs)
+
 # ---- Module-level global settings ----
 
 _global_plot_template = None
