@@ -46,6 +46,9 @@ class PanelResult(BaseResult):
         self._y_name = y_name
         self._theta = kwargs.get("theta", None)
         self._n_groups = kwargs.get("n_groups", None)
+        self._chi2_stat = kwargs.get("chi2_stat", None)
+        self._chi2_label = kwargs.get("chi2_label", None)
+        self._ll = kwargs.get("ll", None)
 
     @property
     def coef(self):
@@ -189,11 +192,16 @@ class PanelResult(BaseResult):
             lines.append(right("Prob > F", self._f_pval))
         elif self._model_type in ("re", "mle", "pa"):
             from scipy.stats import chi2
-            wald_chi2 = float(self._coef @ np.linalg.inv(
-                np.diag(self._std_err ** 2)) @ self._coef) if len(self._coef) > 0 else 0.0
-            chi2_pval = 1 - chi2.cdf(wald_chi2, self._df_model)
-            chi2_label = f"{'Wald' if self._model_type == 're' else 'LR' if self._model_type == 'mle' else 'Wald'} chi2({self._df_model})"
-            lines.append(right(chi2_label, wald_chi2, "8.2f"))
+            if self._chi2_stat is not None:
+                chi2_val = self._chi2_stat
+                chi2_pval = 1 - chi2.cdf(chi2_val, self._df_model)
+                chi2_label = self._chi2_label or f"chi2({self._df_model})"
+            else:
+                chi2_val = float(self._coef @ np.linalg.inv(
+                    np.diag(self._std_err ** 2)) @ self._coef) if len(self._coef) > 0 else 0.0
+                chi2_pval = 1 - chi2.cdf(chi2_val, self._df_model)
+                chi2_label = f"chi2({self._df_model})"
+            lines.append(right(chi2_label, chi2_val, "8.2f"))
             lines.append(right("Prob > chi2", chi2_pval))
 
         lines.append("")

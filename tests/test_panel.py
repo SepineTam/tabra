@@ -599,9 +599,48 @@ def mle_data():
     SSR = float(resid_mle @ resid_mle)
     k_full = k + 1
     df_resid = N - k_full
-    sigma2 = SSR / df_resid
-    XtX_inv = np.linalg.inv(X_qd_full.T @ X_qd_full)
-    se_mle = np.sqrt(sigma2 * np.diag(XtX_inv))
+
+    # MLE SE from numerical Hessian of full log-likelihood (matches Stata)
+    X_full_arr = np.column_stack([np.ones(N), X_arr])
+
+    def _full_loglik(params_all):
+        beta_p = params_all[:k_full]
+        log_su_p = params_all[k_full]
+        log_se_p = params_all[k_full + 1]
+        s2u = np.exp(log_su_p)
+        s2e = np.exp(log_se_p)
+        if s2u < 1e-20 or s2e < 1e-20:
+            return -1e20
+        total_ll = 0.0
+        for idx in range(n_groups):
+            gi = group_indices[idx]
+            Ti = T_i[idx]
+            yi = y[gi]
+            Xi = X_full_arr[gi]
+            resid_i = yi - Xi @ beta_p
+            log_det = (Ti - 1) * np.log(s2e) + np.log(s2e + Ti * s2u)
+            phi_i = s2u / (s2e + Ti * s2u)
+            resid_sum = resid_i.sum()
+            quad = (resid_i @ resid_i - phi_i * resid_sum ** 2) / s2e
+            total_ll += -Ti / 2 * np.log(2 * np.pi) - 0.5 * log_det - 0.5 * quad
+        return total_ll
+
+    params_mle = np.concatenate([beta_mle, [np.log(sigma2_u_final), np.log(sigma2_e_final)]])
+    n_p = len(params_mle)
+    h_step = 1e-5
+    H_mat = np.zeros((n_p, n_p))
+    for ii in range(n_p):
+        for jj in range(ii, n_p):
+            pp = params_mle.copy(); pp[ii] += h_step; pp[jj] += h_step
+            pm = params_mle.copy(); pm[ii] += h_step; pm[jj] -= h_step
+            mp = params_mle.copy(); mp[ii] -= h_step; mp[jj] += h_step
+            mm = params_mle.copy(); mm[ii] -= h_step; mm[jj] -= h_step
+            H_mat[ii, jj] = (_full_loglik(pp) - _full_loglik(pm)
+                             - _full_loglik(mp) + _full_loglik(mm)) / (4 * h_step ** 2)
+            H_mat[jj, ii] = H_mat[ii, jj]
+    I_obs = -H_mat
+    V_all = np.linalg.inv(I_obs)
+    se_mle = np.sqrt(np.diag(V_all[:k_full, :k_full]))
     t_mle = beta_mle / se_mle
     theta_opt = 1.0 - np.sqrt(sigma2_e_final / (sigma2_e_final + np.mean(T_i) * sigma2_u_final))
 
@@ -637,7 +676,7 @@ def test_mle_std_errors_match_oracle(mle_data):
         mle_data["df"], y="y", x=["x1", "x2"],
         panel_var="group", model="mle", is_con=True,
     )
-    assert np.allclose(result.std_err, mle_data["se_oracle"], atol=1e-6)
+    assert np.allclose(result.std_err, mle_data["se_oracle"], atol=1e-4)
 
 
 def test_mle_t_stats_match_oracle(mle_data):

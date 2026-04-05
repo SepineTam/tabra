@@ -441,8 +441,46 @@ class PanelModel(BaseModel):
         resid_mle = y_qd - X_qd_full @ beta
         SSR = float(resid_mle @ resid_mle)
         df_resid = n_qd - k_qd
-        sigma2 = SSR / df_resid
-        var_beta = sigma2 * XtX_inv
+
+        # MLE SE from observed information matrix (numerical Hessian)
+        def _full_loglik(params_all):
+            beta_p = params_all[:k_qd]
+            log_su = params_all[k_qd]
+            log_se = params_all[k_qd + 1]
+            s2u = np.exp(log_su)
+            s2e = np.exp(log_se)
+            if s2u < 1e-20 or s2e < 1e-20:
+                return -1e20
+            total_ll = 0.0
+            for idx in range(n_groups):
+                gi = group_indices[idx]
+                Ti = T_i[idx]
+                yi = y_vec[gi]
+                Xi = np.column_stack([np.ones(Ti), X[gi]]) if is_con else X[gi]
+                resid_i = yi - Xi @ beta_p
+                log_det = (Ti - 1) * np.log(s2e) + np.log(s2e + Ti * s2u)
+                phi_i = s2u / (s2e + Ti * s2u)
+                resid_sum = resid_i.sum()
+                quad = (resid_i @ resid_i - phi_i * resid_sum ** 2) / s2e
+                total_ll += -Ti / 2 * np.log(2 * np.pi) - 0.5 * log_det - 0.5 * quad
+            return total_ll
+
+        params_mle = np.concatenate([beta, [np.log(sigma2_u_final), np.log(sigma2_e_final)]])
+        n_params = len(params_mle)
+        h = 1e-5
+        H = np.zeros((n_params, n_params))
+        for i in range(n_params):
+            for j in range(i, n_params):
+                pp = params_mle.copy(); pp[i] += h; pp[j] += h
+                pm = params_mle.copy(); pm[i] += h; pm[j] -= h
+                mp = params_mle.copy(); mp[i] -= h; mp[j] += h
+                mm = params_mle.copy(); mm[i] -= h; mm[j] -= h
+                H[i, j] = (_full_loglik(pp) - _full_loglik(pm)
+                           - _full_loglik(mp) + _full_loglik(mm)) / (4 * h * h)
+                H[j, i] = H[i, j]
+        I_obs = -H
+        V_full = np.linalg.inv(I_obs)
+        var_beta = V_full[:k_qd, :k_qd]
         std_err = np.sqrt(np.diag(var_beta))
         t_stat = beta / std_err
         p_value = np.array([t_pval(t, df_resid) for t in t_stat])
@@ -501,7 +539,7 @@ class PanelModel(BaseModel):
             var_names=var_names,
             SSR=SSR, SSE=SSE, SST=SST,
             df_model=df_model, df_resid=df_resid,
-            mse=sigma2, root_mse=np.sqrt(sigma2),
+            mse=sigma2_e_final, root_mse=np.sqrt(sigma2_e_final),
             sigma_u=sigma_u, sigma_e=sigma_e, rho=rho,
             y_name=y, theta=1.0 - np.sqrt(sigma2_e_final / (sigma2_e_final + np.mean(T_i) * sigma2_u_final)),
             n_groups=n_groups,
