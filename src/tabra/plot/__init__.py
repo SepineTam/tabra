@@ -116,6 +116,7 @@ class PlotOps:
 
     def scatter(self, y: str, x: str, title: str = None,
                 xtitle: str = None, ytitle: str = None,
+                notes: str = None, legend: dict = None,
                 template=None,
                 fig_setting=None):
         """Draw a scatter plot.
@@ -143,6 +144,7 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def _apply_template(self, template, ax):
@@ -151,6 +153,12 @@ class PlotOps:
             ax.spines["top"].set_visible(False)
         if not template.spine_right:
             ax.spines["right"].set_visible(False)
+
+    def _apply_extras(self, fig, ax, notes, legend, template):
+        """Apply notes and legend configuration."""
+        from tabra.plot._annotations import apply_notes, apply_legend
+        apply_notes(fig, notes, template)
+        apply_legend(ax, legend, template)
 
     def _make_fig(self, template):
         """Create a figure with template sizing."""
@@ -162,6 +170,7 @@ class PlotOps:
 
     def hist(self, var: str, bins: int = 30, title: str = None,
              xtitle: str = None, ytitle: str = None,
+             notes: str = None, legend: dict = None,
              template=None, density: bool = False,
              fig_setting=None):
         """Draw a histogram.
@@ -190,10 +199,12 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def bar(self, var: str, by: str = None, stat: str = "mean",
             title: str = None, xtitle: str = None, ytitle: str = None,
+            notes: str = None, legend: dict = None,
             template=None, fig_setting=None):
         """Draw a bar plot.
 
@@ -236,10 +247,12 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def lfit(self, y: str, x: str, title: str = None,
              xtitle: str = None, ytitle: str = None,
+             notes: str = None, legend: dict = None,
              template=None, fig_setting=None):
         """Draw a linear fit plot (OLS regression line).
 
@@ -281,11 +294,13 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def lfitci(self, y: str, x: str, title: str = None,
                xtitle: str = None, ytitle: str = None,
                level: float = 0.95,
+               notes: str = None, legend: dict = None,
                template=None, fig_setting=None):
         """Draw a linear fit plot with confidence interval.
 
@@ -337,10 +352,12 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def line(self, y: str, x: str = None, by: str = None,
              title: str = None, xtitle: str = None, ytitle: str = None,
+             notes: str = None, legend: dict = None,
              template=None, fig_setting=None):
         """Draw a line plot.
 
@@ -373,7 +390,6 @@ class PlotOps:
                 x_data = self._df.loc[mask, x] if x else self._df.loc[mask].index
                 y_data = self._df.loc[mask, y]
                 ax.plot(x_data, y_data, color=colors[i % len(colors)], label=g)
-            ax.legend(fontsize=template.legend_size)
             ax.set_xlabel(xtitle if xtitle is not None else (x if x else "Index"))
         else:
             x_data = self._df[x] if x else self._df.index
@@ -384,9 +400,11 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def pie(self, var: str, title: str = None,
+             notes: str = None, legend: dict = None,
              template=None, fig_setting=None):
         """Draw a pie chart of value counts for a variable.
 
@@ -412,10 +430,12 @@ class PlotOps:
         ax.set_aspect("equal")
         if title is not None:
             ax.set_title(title)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def violin(self, var: str, by: str = None, title: str = None,
                xtitle: str = None, ytitle: str = None,
+               notes: str = None, legend: dict = None,
                template=None, fig_setting=None):
         """Draw a violin plot.
 
@@ -453,10 +473,12 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def box(self, var, by: str = None, title: str = None,
                xtitle: str = None, ytitle: str = None,
+               notes: str = None, legend: dict = None,
                template=None, fig_setting=None):
         """Draw a box plot.
 
@@ -522,10 +544,12 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def mix(self, layers: list, title: str = None,
             xtitle: str = None, ytitle: str = None,
+            notes: str = None, legend: dict = None,
             template=None, fig_setting=None):
         """Overlay multiple plot layers on a single axes (like Stata twoway).
 
@@ -625,6 +649,7 @@ class PlotOps:
         if ytitle is not None:
             ax.set_ylabel(ytitle)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def coefplot(self, result=None, **kwargs):
@@ -645,6 +670,7 @@ class PlotOps:
     def kdensity(self, var, by: str = None,
                  bw=None, kernel: str = "gaussian",
                  title: str = None, xtitle: str = None, ytitle: str = None,
+                 notes: str = None, legend: dict = None,
                  template=None, fig_setting=None):
         """Draw a kernel density estimation plot.
 
@@ -731,12 +757,15 @@ class PlotOps:
             axes_flat[idx].set_visible(False)
 
         fig.tight_layout()
+        self._apply_extras(fig, axes_flat[0], notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def heatmap(self, data=None, *, var_names=None,
                 annot=True, fmt=".2f", cmap="RdBu_r",
                 vmin=-1.0, vmax=1.0,
-                title=None, template=None, fig_setting=None):
+                title=None,
+                notes: str = None, legend: dict = None,
+                template=None, fig_setting=None):
         """Draw a heatmap from a correlation matrix or result.
 
         Args:
@@ -832,10 +861,12 @@ class PlotOps:
             ax.spines["right"].set_visible(False)
 
         fig.tight_layout()
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
     def rvfplot(self, result=None, title=None,
                 xtitle=None, ytitle=None,
+                notes: str = None, legend: dict = None,
                 template=None, fig_setting=None):
         """Draw a residual-vs-fitted plot (like Stata rvfplot).
 
@@ -888,6 +919,7 @@ class PlotOps:
         if title is not None:
             ax.set_title(title)
         self._apply_template(template, ax)
+        self._apply_extras(fig, ax, notes, legend, template)
         return TabraFigure(fig, tabra=self._tabra)
 
 # ---- Module-level global settings ----

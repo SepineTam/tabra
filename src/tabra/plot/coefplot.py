@@ -224,9 +224,6 @@ def _render_horizontal(ax, series_list, labels, xline, ci_style, tmpl):
     ax.set_yticklabels(all_names)
     ax.invert_yaxis()
 
-    if labels and n_models > 1:
-        ax.legend(fontsize=tmpl.legend_size)
-
 
 def _render_vertical(ax, series_list, labels, xline, ci_style, tmpl):
     """Render vertical coefplot (variable names on X-axis)."""
@@ -265,9 +262,6 @@ def _render_vertical(ax, series_list, labels, xline, ci_style, tmpl):
     ax.set_xticks(x_pos)
     ax.set_xticklabels(all_names, rotation=45, ha="right")
 
-    if labels and n_models > 1:
-        ax.legend(fontsize=tmpl.legend_size)
-
 
 def plot_coefplot(result_or_list=None, *,
                   keep=None, drop=None,
@@ -276,6 +270,7 @@ def plot_coefplot(result_or_list=None, *,
                   ci_style='spike',
                   labels=None,
                   title=None, xtitle=None, ytitle=None,
+                  notes=None, legend=None,
                   template=None):
     """Plot regression coefficients with confidence intervals.
 
@@ -405,4 +400,8 @@ def plot_coefplot(result_or_list=None, *,
             ax.spines["right"].set_visible(False)
 
     fig.tight_layout()
+    from tabra.plot._annotations import apply_notes, apply_legend
+    apply_notes(fig, notes, tmpl)
+    for ax in axes:
+        apply_legend(ax, legend, tmpl)
     return TabraFigure(fig)

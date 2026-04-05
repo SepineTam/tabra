@@ -44,6 +44,10 @@ class PlotTemplateBase:
         "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
     )
 
+    # Note (footnote)
+    note_size: float = 8.0
+    note_color: str = "#555555"
+
     # Background
     facecolor: str = "white"
 
