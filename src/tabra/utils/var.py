@@ -35,4 +35,8 @@ def resolve_var(var: str | list[str], var_list: list[str]) -> list[str]:
 
     # Fallback: treat raw input as regex
     raw = " ".join(tokens) if isinstance(var, list) else var
-    return [c for c in var_list if re.search(raw, c)]
+    matched = [c for c in var_list if re.search(raw, c)]
+
+    if not matched:
+        raise KeyError(f"Variable '{raw}' not found")
+    return matched
