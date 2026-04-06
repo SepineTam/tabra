@@ -138,7 +138,7 @@ def test_single_fe_r_squared():
 
 
 def test_single_fe_df_a():
-    """Single FE: df_a 应等于类别数 - 1"""
+    """Single FE: df_a should equal number of categories (reghdfe convention)."""
     from tabra.models.estimate.reghdfe import RegHDFE
 
     np.random.seed(42)
@@ -152,8 +152,8 @@ def test_single_fe_df_a():
     model = RegHDFE()
     result = model.fit(df, y="y", x=["x1"], absorb=["group"])
 
-    # df_a = K - 1 = 10 - 1 = 9 for single FE with constant
-    assert result.df_a == n_groups - 1
+    # reghdfe convention: df_a = K (all categories for first FE)
+    assert result.df_a == n_groups
 
 
 def test_single_fe_n_obs():
@@ -248,13 +248,14 @@ def test_twoway_fe_n_hdfe(panel_data):
 
 
 def test_twoway_fe_df_r(panel_data):
-    """Two-way FE: df_r = N - K - df_a"""
+    """Two-way FE: df_r = N - df_a - df_model."""
     from tabra.models.estimate.reghdfe import RegHDFE
 
     model = RegHDFE()
     result = model.fit(panel_data, y="y", x=["x1", "x2"], absorb=["id", "time"])
 
-    expected_df_r = result.n_obs - result.k_vars - result.df_a
+    # df_resid = n - df_a - df_model (df_model = active slopes only)
+    expected_df_r = result.n_obs - result.df_a - result.df_model
     assert result.df_resid == expected_df_r
 
 
