@@ -206,6 +206,8 @@ class IVTobitModel(BaseModel):
                     left_censored, right_censored, uncensored, eps=1e-6
                 )
                 if B is not None:
+                    # Stata applies n/(n-1) finite-sample adjustment to meat
+                    B = B * (n / (n - 1))
                     V_full = V_full @ B @ V_full
 
             # Map: display order [b2, b1, b0] → theta indices [b1, b2, b0, ...]

@@ -299,7 +299,7 @@ class TestIVRegHDFEStataCrossValidation:
             instruments=["z1", "z2"], absorb=["id"],
             estimator="2sls", vce="cluster", cluster="id"
         )
-        np.testing.assert_allclose(r.std_err, [0.0829351, 0.0521819], rtol=2e-3)
+        np.testing.assert_allclose(r.std_err, [0.0829351, 0.0521819], rtol=1e-5)
 
     def test_s3_r2(self, data):
         from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
@@ -319,3 +319,25 @@ class TestIVRegHDFEStataCrossValidation:
         )
         assert r.df_a == 0
         assert r.df_r == 498
+
+    def test_s2_diagnostics(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id", "year"],
+            estimator="2sls", vce="robust"
+        )
+        np.testing.assert_allclose(r.widstat, 88.908, rtol=1e-4)
+        np.testing.assert_allclose(r.idstat, 96.748, rtol=1e-4)
+        assert r.idp < 1e-10
+
+    def test_s3_diagnostics(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="cluster", cluster="id"
+        )
+        np.testing.assert_allclose(r.widstat, 94.487, rtol=1e-4)
+        np.testing.assert_allclose(r.idstat, 33.953, rtol=1e-4)
+        np.testing.assert_allclose(r.idp, 4.238e-08, rtol=1e-3)

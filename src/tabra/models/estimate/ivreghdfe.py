@@ -164,7 +164,7 @@ class IVRegHDFEModel(BaseModel):
                 ec = resid[idx]
                 meat += Xc.T @ np.outer(ec, ec) @ Xc
             N_g = len(unique_clusts)
-            small_adj = (N_g / (N_g - 1)) * ((n - 1) / df_r)
+            small_adj = (N_g / (N_g - 1)) * (n / (n - k))
             var_beta = small_adj * XtX_hat_inv @ meat @ XtX_hat_inv
 
         std_err = np.sqrt(np.maximum(np.diag(var_beta), 0))
@@ -191,8 +191,6 @@ class IVRegHDFEModel(BaseModel):
         var_names = endog + exog
 
         # Weak identification and underidentification tests
-        # For unadjusted VCE: Cragg-Donald F + Anderson LM
-        # For robust/cluster VCE: return None (Kleibergen-Paap not yet implemented)
         widstat = None
         idstat = None
         idpval = None
@@ -253,6 +251,81 @@ class IVRegHDFEModel(BaseModel):
                         idpval = float(1 - sp_stats.chi2.cdf(idstat, df_id))
                     else:
                         idpval = None
+            except Exception:
+                pass
+        elif vce in ("robust", "cluster"):
+            try:
+                # Partial out exogenous variables from endogenous and instruments
+                if n_exog > 0:
+                    Q1 = X1_tilde @ np.linalg.inv(
+                        X1_tilde.T @ X1_tilde
+                    ) @ X1_tilde.T
+                    X2_resid = X2_tilde - Q1 @ X2_tilde
+                    Z_excl_resid = Z_tilde - Q1 @ Z_tilde
+                else:
+                    X2_resid = X2_tilde
+                    Z_excl_resid = Z_tilde
+
+                L_excl = Z_excl_resid.shape[1]
+                K_endog = X2_resid.shape[1]
+
+                if K_endog == 1:
+                    x = X2_resid[:, 0]
+                    z = Z_excl_resid
+                    ZtX = z.T @ x
+                    XtZ = x.T @ z
+
+                    # Kleibergen-Paap rk LM (underidentification test)
+                    # Uses H0 residuals (x itself, no first stage)
+                    if vce == "robust":
+                        S_lm = np.zeros((z.shape[1], z.shape[1]))
+                        for i in range(n):
+                            S_lm += x[i] ** 2 * np.outer(z[i], z[i])
+                    else:  # cluster
+                        S_lm = np.zeros((z.shape[1], z.shape[1]))
+                        clust_arr = cluster_arrays[0]
+                        for c in np.unique(clust_arr):
+                            idx = clust_arr == c
+                            xz = x[idx] @ z[idx]
+                            S_lm += np.outer(xz, xz)
+                    idstat = float(ZtX @ np.linalg.inv(S_lm) @ XtZ)
+
+                    # Kleibergen-Paap rk Wald F (weak identification test)
+                    # Uses Ha residuals (first-stage residuals)
+                    beta_fs = np.linalg.solve(z.T @ z, z.T @ x)
+                    resid_fs = x - z @ beta_fs
+                    if vce == "robust":
+                        S_wald = np.zeros((z.shape[1], z.shape[1]))
+                        for i in range(n):
+                            S_wald += resid_fs[i] ** 2 * np.outer(z[i], z[i])
+                    else:  # cluster
+                        S_wald = np.zeros((z.shape[1], z.shape[1]))
+                        clust_arr = cluster_arrays[0]
+                        for c in np.unique(clust_arr):
+                            idx = clust_arr == c
+                            rzz = resid_fs[idx] @ z[idx]
+                            S_wald += np.outer(rzz, rzz)
+                    wald_chi2 = float(ZtX @ np.linalg.inv(S_wald) @ XtZ)
+
+                    if vce == "robust":
+                        # F = chi2 / L * (n - df_a - L - 1) / n
+                        widstat = wald_chi2 / L_excl * (n - df_a - L_excl - 1) / n
+                    else:
+                        # cluster
+                        N_g = len(np.unique(cluster_arrays[0]))
+                        # F = chi2 / L * (N_g - 1) / N_g * (n - L - 1) / n
+                        widstat = wald_chi2 / L_excl * (N_g - 1) / N_g * (n - L_excl - 1) / n
+
+                    df_id = L_excl - K_endog + 1 if L_excl >= K_endog else K_endog - L_excl + 1
+                    if df_id > 0:
+                        idpval = float(1 - sp_stats.chi2.cdf(idstat, df_id))
+                    else:
+                        idpval = None
+                else:
+                    # Multiple endogenous variables: use Cragg-Donald as fallback
+                    widstat = self._cragg_donald(
+                        X2_resid, Z_excl_resid, df_r, L_excl, K_endog
+                    )
             except Exception:
                 pass
 
