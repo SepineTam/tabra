@@ -14,6 +14,8 @@ tab = load_data(pd.read_stata(
 tab.data.sum()
 tab.data.gen("p__sq", "price ^ 2")
 
+tab.reghdfe("price", ["mpg", "weight"], absorb=["rep78"])
+
 tab.plot.hist(
     "p__sq",
     bins=20,

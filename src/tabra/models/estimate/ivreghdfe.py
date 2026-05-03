@@ -8,10 +8,11 @@
 # @File   : ivreghdfe.py
 
 import numpy as np
+from scipy import stats as sp_stats
 from tabra.models.estimate.base import BaseModel
 from tabra.models.estimate.reghdfe import (
     _remove_singletons, _map_partial_out, _compute_df_a,
-    pd_factorize,
+    _compute_df_a_nested, pd_factorize,
 )
 from tabra.results.iv_result import IVResult
 
@@ -33,10 +34,13 @@ class IVRegHDFEModel(BaseModel):
         instruments = list(instruments)
         absorb = list(absorb)
 
+        # Deduplicate columns to avoid duplicate column name issues
         all_cols = [y] + exog + endog + instruments + absorb
         if cluster is not None:
             cluster_list = cluster if isinstance(cluster, list) else [cluster]
-            all_cols.extend(cluster_list)
+            for c in cluster_list:
+                if c not in all_cols:
+                    all_cols.append(c)
         df = df[all_cols].dropna().reset_index(drop=True)
 
         y_vec = df[y].values.astype(float)
@@ -77,10 +81,10 @@ class IVRegHDFEModel(BaseModel):
         n = len(y_vec)
         n_exog = X1.shape[1]
         n_endog = X2.shape[1]
+        N_hdfe = len(fe_arrays)
 
         # MAP partial-out: demean y, X1, X2, Z_inst
         if len(fe_arrays) > 0:
-            # Combine all variables to partial out together
             all_vars = np.column_stack([X1, X2, Z_inst]) if n_exog > 0 \
                 else np.column_stack([X2, Z_inst])
 
@@ -102,12 +106,7 @@ class IVRegHDFEModel(BaseModel):
             X2_tilde = X2
             Z_tilde = Z_inst
 
-        # Now use IVModel logic on transformed data
-        from tabra.models.estimate.iv import IVModel
-        iv_model = IVModel()
-
-        # Build Z_full and X for IV (no constant — already demeaned)
-        # After demeaning, constant is absorbed, so is_con=False
+        # Build Z_full (all exogenous + instruments) and X_full (endog + exog)
         Z_full = np.column_stack([X1_tilde, Z_tilde]) if n_exog > 0 \
             else Z_tilde.copy()
         X_full = np.column_stack([X2_tilde, X1_tilde]) if n_exog > 0 \
@@ -116,7 +115,9 @@ class IVRegHDFEModel(BaseModel):
         k_z = Z_full.shape[1]
         k = X_full.shape[1]
 
-        PZ = Z_full @ np.linalg.inv(Z_full.T @ Z_full) @ Z_full.T
+        ZtZ_inv = np.linalg.inv(Z_full.T @ Z_full)
+        PZ = Z_full @ ZtZ_inv @ Z_full.T
+        MZ = np.eye(n) - PZ
 
         # 2SLS on transformed data
         X_hat = PZ @ X_full
@@ -124,19 +125,33 @@ class IVRegHDFEModel(BaseModel):
         beta = XtX_hat_inv @ X_hat.T @ y_tilde
         resid = y_tilde - X_full @ beta
 
+        # Degrees of freedom
+        if cluster is not None and vce == "cluster":
+            df_a = _compute_df_a_nested(fe_arrays, cluster_list, absorb)
+        else:
+            df_a = _compute_df_a(fe_arrays, cluster, vce)
+
+        df_r = n - k - df_a
+        if df_r <= 0:
+            df_r = n - k
+        df_m = k
+
+        # For cluster VCE, test df_r = N_g - 1
+        df_r_test = df_r
+        N_g = None
+        if vce == "cluster" and cluster_arrays is not None:
+            N_g = len(np.unique(cluster_arrays[0]))
+            df_r_test = N_g - 1
+
         # VCE
         if vce == "unadjusted":
-            df_a = _compute_df_a(fe_arrays, cluster, vce)
-            df_resid = n - k - df_a
-            if df_resid <= 0:
-                df_resid = n - k
-            sigma2 = resid @ resid / df_resid
+            sigma2 = float(resid @ resid) / df_r
             var_beta = sigma2 * XtX_hat_inv
         elif vce == "robust":
             e2 = resid ** 2
             meat = (X_hat.T * e2) @ X_hat
-            var_beta = XtX_hat_inv @ meat @ XtX_hat_inv
-            df_resid = n - k
+            hc1_adj = n / df_r  # small-sample correction
+            var_beta = hc1_adj * XtX_hat_inv @ meat @ XtX_hat_inv
         elif vce == "cluster":
             if cluster_arrays is None:
                 raise ValueError("cluster vce requires cluster variable names")
@@ -149,56 +164,99 @@ class IVRegHDFEModel(BaseModel):
                 ec = resid[idx]
                 meat += Xc.T @ np.outer(ec, ec) @ Xc
             N_g = len(unique_clusts)
-            df_a = _compute_df_a(fe_arrays, cluster, vce)
-            df_resid = n - k - df_a
-            if df_resid <= 0:
-                df_resid = n - k
-            adj = (N_g / (N_g - 1)) * ((n - 1) / df_resid)
-            var_beta = adj * XtX_hat_inv @ meat @ XtX_hat_inv
-            df_resid = n - k  # for simplicity
+            small_adj = (N_g / (N_g - 1)) * ((n - 1) / df_r)
+            var_beta = small_adj * XtX_hat_inv @ meat @ XtX_hat_inv
 
         std_err = np.sqrt(np.maximum(np.diag(var_beta), 0))
-        from scipy import stats as sp_stats
         z_stat = beta / std_err
-        p_value = 2 * (1 - sp_stats.norm.cdf(np.abs(z_stat)))
+        p_value = 2 * (1 - sp_stats.t.cdf(np.abs(z_stat), df_r_test))
 
-        # R-squared
+        # R-squared and RMSE using correct df_r
         SST = float(y_tilde @ y_tilde)
         SSR = float(resid @ resid)
         r_squared = 1 - SSR / SST if SST > 0 else 0.0
-        df_resid_final = n - k
-        r_squared_adj = 1 - (1 - r_squared) * (n - 1) / df_resid_final if df_resid_final > 0 else 0.0
-        root_mse = np.sqrt(SSR / df_resid_final) if df_resid_final > 0 else 0.0
+        r_squared_adj = 1 - (1 - r_squared) * (n - 1) / df_r \
+            if df_r > 0 else 0.0
+        root_mse = np.sqrt(SSR / df_r) if df_r > 0 else 0.0
 
-        df_m = k
-        df_a = _compute_df_a(fe_arrays, cluster, vce)
-
-        var_names = endog + exog
-
-        # First-stage F
-        first_stage_f = None
+        # Model F-statistic
+        F_stat = None
         try:
-            f_stats = []
-            ZtZ_inv_local = np.linalg.inv(Z_full.T @ Z_full)
-            for j in range(n_endog):
-                y_j = X2_tilde[:, j]
-                beta_j = ZtZ_inv_local @ Z_full.T @ y_j
-                resid_j = y_j - Z_full @ beta_j
-                SSR_j = resid_j @ resid_j
-                SST_j = y_j @ y_j
-                SSE_j = SST_j - SSR_j
-                df_model_j = k_z
-                df_resid_j = n - k_z
-                if df_model_j > 0 and df_resid_j > 0:
-                    f_j = (SSE_j / df_model_j) / (SSR_j / df_resid_j)
-                else:
-                    f_j = 0.0
-                f_stats.append(f_j)
-            first_stage_f = min(f_stats) if f_stats else 0.0
+            F_stat = float(
+                (beta.T @ np.linalg.solve(var_beta, beta)) / df_m
+            ) if df_m > 0 else 0.0
         except Exception:
             pass
 
-        # Overid J
+        var_names = endog + exog
+
+        # Weak identification and underidentification tests
+        # For unadjusted VCE: Cragg-Donald F + Anderson LM
+        # For robust/cluster VCE: return None (Kleibergen-Paap not yet implemented)
+        widstat = None
+        idstat = None
+        idpval = None
+        if vce == "unadjusted":
+            try:
+                # Partial F: regress endogenous on excluded instruments only,
+                # after partialling out exogenous variables
+                if n_exog > 0:
+                    Q1 = X1_tilde @ np.linalg.inv(
+                        X1_tilde.T @ X1_tilde
+                    ) @ X1_tilde.T
+                    X2_resid = X2_tilde - Q1 @ X2_tilde
+                    Z_excl_resid = Z_tilde - Q1 @ Z_tilde
+                else:
+                    X2_resid = X2_tilde
+                    Z_excl_resid = Z_tilde
+
+                L_excl = Z_excl_resid.shape[1]
+                K_endog = X2_resid.shape[1]
+
+                if n_endog == 1:
+                    beta_j = np.linalg.solve(
+                        Z_excl_resid.T @ Z_excl_resid,
+                        Z_excl_resid.T @ X2_resid[:, 0]
+                    )
+                    resid_j = X2_resid[:, 0] - Z_excl_resid @ beta_j
+                    SSR_j = float(resid_j @ resid_j)
+                    SST_j = float(X2_resid[:, 0] @ X2_resid[:, 0])
+                    SSE_j = SST_j - SSR_j
+                    df_num = L_excl
+                    df_denom = df_r
+                    if df_num > 0 and df_denom > 0:
+                        widstat = (SSE_j / df_num) / (SSR_j / df_denom)
+                    else:
+                        widstat = 0.0
+                else:
+                    widstat = self._cragg_donald(
+                        X2_resid, Z_excl_resid, df_r, L_excl, K_endog
+                    )
+
+                # Anderson LM
+                L_excl_id = Z_excl_resid.shape[1]
+                K_endog_id = X2_resid.shape[1]
+                min_dim = min(L_excl_id, K_endog_id)
+                if min_dim > 0:
+                    A = X2_resid.T @ Z_excl_resid
+                    B_z = Z_excl_resid.T @ Z_excl_resid
+                    B_x = X2_resid.T @ X2_resid
+                    B_z_inv = np.linalg.inv(B_z)
+                    B_x_inv = np.linalg.inv(B_x)
+                    M = B_x_inv @ A @ B_z_inv @ A.T
+                    eigenvalues = np.linalg.eigvalsh(M)
+                    min_eig = float(np.min(np.maximum(eigenvalues, 0)))
+                    idstat = n * min_eig
+                    df_id = L_excl_id - K_endog_id + 1 if L_excl_id >= K_endog_id \
+                        else K_endog_id - L_excl_id + 1
+                    if df_id > 0:
+                        idpval = float(1 - sp_stats.chi2.cdf(idstat, df_id))
+                    else:
+                        idpval = None
+            except Exception:
+                pass
+
+        # Overidentification J test
         L = Z_inst.shape[1]
         K_endog = n_endog
         if L > K_endog:
@@ -219,17 +277,34 @@ class IVRegHDFEModel(BaseModel):
             coef=beta, std_err=std_err, z_stat=z_stat, p_value=p_value,
             r_squared=r_squared, r_squared_adj=r_squared_adj,
             root_mse=root_mse,
-            n_obs=n, k_vars=k, df_m=df_m,
-            first_stage_f=first_stage_f,
+            n_obs=n, k_vars=k, df_m=df_m, df_r=df_r, df_a=df_a,
+            F=F_stat, N_hdfe=N_hdfe,
+            first_stage_f=None,
             j_stat=j_stat, j_pval=j_pval,
             endog_test_stat=None, endog_test_pval=None,
             var_names=var_names, y_name=y,
             estimator=estimator, vce_type=vce_label,
             endog_names=endog, exog_names=exog,
             inst_names=instruments,
-            idstat=None, idpval=None,
-            widstat=first_stage_f,
+            idstat=idstat, idpval=idpval,
+            widstat=widstat,
         )
+
+    @staticmethod
+    def _cragg_donald(X2_resid, Z_excl_resid, df_r, L_excl, K_endog):
+        """Compute Cragg-Donald Wald F for multiple endogenous variables."""
+        A = X2_resid.T @ Z_excl_resid
+        B_z = Z_excl_resid.T @ Z_excl_resid
+        B_x = X2_resid.T @ X2_resid
+        B_z_inv = np.linalg.inv(B_z)
+        B_x_inv = np.linalg.inv(B_x)
+        M = B_x_inv @ A @ B_z_inv @ A.T
+        eigenvalues = np.linalg.eigvalsh(M)
+        min_eig = float(np.min(np.maximum(eigenvalues, 0)))
+        df_num = L_excl - K_endog + 1 if L_excl >= K_endog else 1
+        if df_num > 0 and df_r > 0:
+            return df_r * min_eig / df_num
+        return 0.0
 
     def estimate(self, df, x, **kwargs):
         raise NotImplementedError("Use fit() for IV HDFE estimation")

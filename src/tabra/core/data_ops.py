@@ -1184,6 +1184,39 @@ class DataOps:
         print(result.to_string(index=False))
         return self
 
+    def count(self, cond: str = None) -> int:
+        """Count observations, optionally with a condition (Stata count).
+
+        Args:
+            cond (str): Condition expression, e.g. ``"price > 6000"``.
+                None counts all observations.
+
+        Returns:
+            int: Number of observations satisfying the condition.
+
+        Example:
+            >>> dta.data.count()
+            74
+            >>> dta.data.count("price > 6000")
+            23
+        """
+        df = self._tabra._df
+        if cond is None:
+            n = len(df)
+        else:
+            # Stata's & and | have lower precedence than comparisons,
+            # but Python's & and | have higher precedence.
+            # Wrap comparison sub-expressions in parentheses.
+            processed = re.sub(
+                r'([\w.]+\s*(?:==|!=|>=|<=|>|<)\s*[^\s&|()]+)',
+                r'(\1)',
+                cond,
+            )
+            mask = self._eval(processed)
+            n = int(mask.sum())
+        print(n)
+        return n
+
     def tabulate(
         self,
         var: str,

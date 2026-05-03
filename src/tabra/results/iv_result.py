@@ -14,8 +14,7 @@ from tabra.results.base import BaseResult
 class IVResult(BaseResult):
     def __init__(self, coef, std_err, z_stat, p_value,
                  r_squared, r_squared_adj, root_mse,
-                 n_obs, k_vars, df_m,
-                 first_stage_f,
+                 n_obs, k_vars, df_m, first_stage_f,
                  j_stat, j_pval,
                  endog_test_stat, endog_test_pval,
                  idstat, idpval,
@@ -23,7 +22,9 @@ class IVResult(BaseResult):
                  var_names, y_name,
                  estimator, vce_type,
                  endog_names, exog_names, inst_names,
-                 kappa=None):
+                 df_r=None, df_a=None,
+                 F=None, N_hdfe=None,
+                 kappa=None, var_beta=None):
         super().__init__()
         self._coef = coef
         self._std_err = std_err
@@ -35,6 +36,10 @@ class IVResult(BaseResult):
         self._n_obs = n_obs
         self._k_vars = k_vars
         self._df_m = df_m
+        self._df_r = df_r
+        self._df_a = df_a
+        self._F = F
+        self._N_hdfe = N_hdfe
         self._first_stage_f = first_stage_f
         self._j_stat = j_stat
         self._j_pval = j_pval
@@ -51,6 +56,7 @@ class IVResult(BaseResult):
         self._exog_names = exog_names
         self._inst_names = inst_names
         self._kappa = kappa
+        self._var_beta = var_beta
 
     @property
     def coef(self):
@@ -91,6 +97,22 @@ class IVResult(BaseResult):
     @property
     def df_m(self):
         return self._df_m
+
+    @property
+    def df_r(self):
+        return self._df_r
+
+    @property
+    def df_a(self):
+        return self._df_a
+
+    @property
+    def F(self):
+        return self._F
+
+    @property
+    def N_hdfe(self):
+        return self._N_hdfe
 
     @property
     def first_stage_f(self):
@@ -156,6 +178,10 @@ class IVResult(BaseResult):
     def kappa(self):
         return self._kappa
 
+    @property
+    def var_beta(self):
+        return self._var_beta
+
     def summary(self):
         lines = []
         lines.append(f"IV regression ({self._estimator.upper()})")
@@ -216,6 +242,8 @@ class IVResult(BaseResult):
         return float(1 - sp_stats.chi2.cdf(chi2, self._df_m))
 
     def _V_sub(self, mask):
+        if self._var_beta is not None:
+            return self._var_beta[np.ix_(mask, mask)]
         return np.diag(self._std_err[mask] ** 2)
 
     def save(self, path):

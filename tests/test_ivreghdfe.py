@@ -159,3 +159,163 @@ class TestIVRegHDFEEdgeCases:
                 ivreghdfe_data, y="y", exog=["x2"],
                 endog=["x1"], instruments=[], absorb=["id"]
             )
+
+
+# ---------------------------------------------------------------------------
+# Stata cross-validation (seed 42, n=500, n_id=50, n_year=10)
+# Baseline from Stata 17 ivreghdfe
+# ---------------------------------------------------------------------------
+
+class TestIVRegHDFEStataCrossValidation:
+    """Stata 17 ivreghdfe baseline cross-validation."""
+
+    @pytest.fixture(scope="class")
+    def data(self):
+        np.random.seed(42)
+        N = 500
+        n_id = 50
+        n_year = 10
+        id_arr = np.repeat(np.arange(1, n_id + 1), n_year)
+        year_arr = np.tile(np.arange(1, n_year + 1), n_id)
+        alpha_i = np.repeat(np.random.normal(0, 1, n_id), n_year)
+        gamma_t = np.tile(np.random.normal(0, 0.5, n_year), n_id)
+        x1 = np.random.normal(0, 1, N)
+        z1 = np.random.normal(0, 1, N)
+        z2 = np.random.normal(0, 1, N)
+        rho = 0.6
+        u = np.random.normal(0, 1, N)
+        v = rho * u + np.sqrt(1 - rho ** 2) * np.random.normal(0, 1, N)
+        x2 = 0.5 * z1 + 0.3 * z2 + 0.4 * x1 + alpha_i * 0.2 + v
+        y = 1.0 + 0.8 * x1 + 1.5 * x2 + alpha_i + gamma_t + u
+        return pd.DataFrame({
+            "y": y, "x1": x1, "x2": x2,
+            "z1": z1, "z2": z2,
+            "id": id_arr, "year": year_arr,
+        })
+
+    # ---- Scene 1: absorb(id), unadjusted ----
+    def test_s1_coef(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.coef, [1.5268896, 0.8572002], rtol=1e-6)
+
+    def test_s1_se(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.std_err, [0.0816087, 0.0608128], rtol=1e-5)
+
+    def test_s1_r2_rmse(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.r_squared, 0.8538983, rtol=1e-6)
+        np.testing.assert_allclose(r.root_mse, 1.0661767, rtol=1e-5)
+
+    def test_s1_df(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="unadjusted"
+        )
+        assert r.df_a == 50
+        assert r.df_r == 448
+
+    def test_s1_diagnostics(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.idstat, 149.23107, rtol=1e-5)
+        np.testing.assert_allclose(r.j_stat, 0.06247414, rtol=1e-5)
+        np.testing.assert_allclose(r.j_pval, 0.80262734, rtol=1e-5)
+
+    # ---- Scene 2: absorb(id year), robust ----
+    def test_s2_coef(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id", "year"],
+            estimator="2sls", vce="robust"
+        )
+        np.testing.assert_allclose(r.coef, [1.4823572, 0.8736909], rtol=1e-6)
+
+    def test_s2_se(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id", "year"],
+            estimator="2sls", vce="robust"
+        )
+        np.testing.assert_allclose(r.std_err, [0.0767163, 0.0586188], rtol=1e-5)
+
+    def test_s2_r2_rmse(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id", "year"],
+            estimator="2sls", vce="robust"
+        )
+        np.testing.assert_allclose(r.r_squared, 0.86421562, rtol=1e-6)
+        np.testing.assert_allclose(r.root_mse, 1.0114432, rtol=1e-5)
+
+    def test_s2_df(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id", "year"],
+            estimator="2sls", vce="robust"
+        )
+        assert r.df_a == 59
+        assert r.df_r == 439
+
+    # ---- Scene 3: absorb(id), cluster ----
+    def test_s3_coef(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="cluster", cluster="id"
+        )
+        np.testing.assert_allclose(r.coef, [1.5268896, 0.8572002], rtol=1e-6)
+
+    def test_s3_se(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="cluster", cluster="id"
+        )
+        np.testing.assert_allclose(r.std_err, [0.0829351, 0.0521819], rtol=2e-3)
+
+    def test_s3_r2(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="cluster", cluster="id"
+        )
+        np.testing.assert_allclose(r.r_squared, 0.8538983, rtol=1e-6)
+
+    def test_s3_df(self, data):
+        from tabra.models.estimate.ivreghdfe import IVRegHDFEModel
+        r = IVRegHDFEModel().fit(
+            data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1", "z2"], absorb=["id"],
+            estimator="2sls", vce="cluster", cluster="id"
+        )
+        assert r.df_a == 0
+        assert r.df_r == 498

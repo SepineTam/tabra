@@ -194,3 +194,234 @@ class TestIVTobitEdgeCases:
         )
         assert result.n_obs == 500
         assert all(np.isfinite(result.coef))
+
+
+class TestIVTobitStataCrossValidation:
+    """Stata cross-validation tests with hard-coded benchmark values.
+
+    Data generated in Stata with:
+        set seed 42
+        set obs 500
+        gen z1 = rnormal()
+        gen x1 = rnormal()
+        gen v = rnormal()
+        gen u_raw = rnormal()
+        local rho = 0.5
+        gen u = `rho'*v + sqrt(1-`rho'^2)*u_raw
+        gen x2 = 0.5 + 0.8*z1 + 0.3*x1 + v
+        gen y_star = 1.0 + 0.5*x1 + 1.2*x2 + u
+        gen y = max(y_star, 0)
+    """
+
+    @pytest.fixture(scope="class")
+    def stata_data(self):
+        """Load the Stata-generated verification data."""
+        return pd.read_stata(
+            "/Users/sepinetam/Documents/Github/tabra/tmp/ivtobit_verify_data.dta"
+        )
+
+    def test_mle_ll0_coef(self, stata_data):
+        """MLE left-censored coefficients match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: x2=1.161804, x1=0.6146017, _cons=0.9717913
+        np.testing.assert_allclose(
+            result.coef, [1.161804, 0.6146017, 0.9717913], rtol=1e-5
+        )
+
+    def test_mle_ll0_se(self, stata_data):
+        """MLE left-censored standard errors match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: se(x2)=0.0647596, se(x1)=0.0563438, se(_cons)=0.0646224
+        np.testing.assert_allclose(
+            result.std_err, [0.0647596, 0.0563438, 0.0646224], rtol=1e-4
+        )
+
+    def test_mle_ll0_z(self, stata_data):
+        """MLE left-censored z-stats match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: z(x2)=17.94, z(x1)=10.91, z(_cons)=15.04
+        np.testing.assert_allclose(
+            result.z_stat, [17.94, 10.91, 15.04], rtol=1e-3
+        )
+
+    def test_mle_ll0_ll(self, stata_data):
+        """MLE left-censored log-likelihood matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: ll = -1219.5157
+        assert result.ll == pytest.approx(-1219.5157, rel=1e-5)
+
+    def test_mle_ll0_chi2(self, stata_data):
+        """MLE left-censored Wald chi2 matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: chi2 = 609.6637
+        assert result.chi2 == pytest.approx(609.6637, rel=1e-4)
+
+    def test_mle_ll0_endog_test(self, stata_data):
+        """MLE left-censored endogeneity test matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: endog chi2 = 72.8583
+        assert result.endog_test_stat == pytest.approx(72.8583, rel=1e-4)
+
+    def test_mle_ll0_censor_counts(self, stata_data):
+        """MLE left-censored censoring counts match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="unadjusted"
+        )
+        # Stata: N_lc=137, N_unc=363
+        assert result.n_lc == 137
+        assert result.n_unc == 363
+        assert result.n_rc == 0
+
+    def test_twostep_coef(self, stata_data):
+        """Twostep coefficients match Stata.
+
+        Note: Python returns [x2, x1, vhat, _cons] while Stata returns
+        [x2, x1, _cons]. The vhat coefficient is the endogeneity control.
+        """
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="twostep", vce="unadjusted"
+        )
+        # Stata: x2=1.161804, x1=0.6146017, _cons=0.9717913
+        # Python: [x2, x1, vhat, _cons]
+        np.testing.assert_allclose(
+            result.coef[:2], [1.161804, 0.6146017], rtol=1e-5
+        )
+        np.testing.assert_allclose(
+            result.coef[3], 0.9717913, rtol=1e-5
+        )
+
+    def test_twostep_se(self, stata_data):
+        """Twostep standard errors match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="twostep", vce="unadjusted"
+        )
+        # Stata: se(x2)=0.0648108, se(x1)=0.0563902, se(_cons)=0.0646673
+        # Python se order: [x2, x1, vhat, _cons]
+        np.testing.assert_allclose(
+            result.std_err[:2], [0.0648108, 0.0563902], rtol=1e-3
+        )
+        np.testing.assert_allclose(
+            result.std_err[3], 0.0646673, rtol=1e-3
+        )
+
+    def test_twostep_chi2(self, stata_data):
+        """Twostep Wald chi2 matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="twostep", vce="unadjusted"
+        )
+        # Stata: chi2 = 608.75315
+        assert result.chi2 == pytest.approx(608.75315, rel=2e-3)
+
+    def test_twostep_endog_test(self, stata_data):
+        """Twostep endogeneity test matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="twostep", vce="unadjusted"
+        )
+        # Stata: endog chi2 = 79.0034
+        assert result.endog_test_stat == pytest.approx(79.0034, rel=1e-4)
+
+    def test_mle_robust_coef(self, stata_data):
+        """MLE robust coefficients match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="robust"
+        )
+        # Stata: x2=1.161804, x1=0.6146017, _cons=0.9717913
+        np.testing.assert_allclose(
+            result.coef, [1.161804, 0.6146017, 0.9717913], rtol=1e-5
+        )
+
+    def test_mle_robust_se(self, stata_data):
+        """MLE robust standard errors match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="robust"
+        )
+        # Stata: se(x2)=0.0644625, se(x1)=0.0586471, se(_cons)=0.0667929
+        np.testing.assert_allclose(
+            result.std_err, [0.0644625, 0.0586471, 0.0667929], rtol=2e-3
+        )
+
+    def test_mle_robust_chi2(self, stata_data):
+        """MLE robust Wald chi2 matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="robust"
+        )
+        # Stata: chi2 = 586.20194
+        assert result.chi2 == pytest.approx(586.20194, rel=3e-3)
+
+    def test_mle_robust_endog_test(self, stata_data):
+        """MLE robust endogeneity test matches Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        result = IVTobitModel().fit(
+            stata_data, y="y", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, method="mle", vce="robust"
+        )
+        # Stata: endog chi2 = 70.0428
+        assert result.endog_test_stat == pytest.approx(70.0428, rel=3e-3)
+
+    def test_mle_double_censored_coef(self, stata_data):
+        """MLE double-censored coefficients match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        df = stata_data.copy()
+        df["y_double"] = np.minimum(np.maximum(df["y_star"], 0), 10)
+        result = IVTobitModel().fit(
+            df, y="y_double", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, ul=10.0, method="mle", vce="unadjusted"
+        )
+        # Stata: x2=1.161804, x1=0.6146017, _cons=0.9717913
+        np.testing.assert_allclose(
+            result.coef, [1.161804, 0.6146017, 0.9717913], rtol=1e-5
+        )
+
+    def test_mle_double_censored_se(self, stata_data):
+        """MLE double-censored standard errors match Stata."""
+        from tabra.models.estimate.ivtobit import IVTobitModel
+        df = stata_data.copy()
+        df["y_double"] = np.minimum(np.maximum(df["y_star"], 0), 10)
+        result = IVTobitModel().fit(
+            df, y="y_double", exog=["x1"], endog=["x2"],
+            instruments=["z1"], ll=0.0, ul=10.0, method="mle", vce="unadjusted"
+        )
+        # Stata: se(x2)=0.0647596, se(x1)=0.0563438, se(_cons)=0.0646224
+        np.testing.assert_allclose(
+            result.std_err, [0.0647596, 0.0563438, 0.0646224], rtol=1e-4
+        )

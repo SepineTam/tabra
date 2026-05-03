@@ -96,7 +96,13 @@ class IVModel(BaseModel):
                 y_vec, X, Z, PZ, MZ, n_exog, n_endog, n, is_con
             )
         elif estimator == "cue":
-            beta, resid = self._fit_cue(y_vec, X, Z, n)
+            if vce == "unadjusted":
+                # Homoskedastic CUE is equivalent to LIML
+                beta, resid, kclass_kappa = self._fit_liml(
+                    y_vec, X, Z, PZ, MZ, n_exog, n_endog, n, is_con
+                )
+            else:
+                beta, resid = self._fit_cue(y_vec, X, Z, n)
         elif estimator == "fuller":
             beta, resid, kclass_kappa = self._fit_fuller(
                 y_vec, X, Z, PZ, MZ, n_exog, n_endog, n, is_con, fuller_alpha
@@ -105,17 +111,19 @@ class IVModel(BaseModel):
             beta, resid, kclass_kappa = self._fit_kclass(y_vec, X, MZ, n, kclass_k)
 
         # First-stage F (Cragg-Donald)
-        first_stage_f = self._first_stage_fstat(X2, Z, is_con, n)
+        first_stage_f = self._first_stage_fstat(X2, Z, Z_inst, is_con, n, n_exog)
 
         # Underidentification: Anderson LM
-        idstat, idpval = self._anderson_lm(X2, Z, n, L)
+        idstat, idpval = self._anderson_lm(X2, Z, Z_inst, n, L, is_con, n_exog)
 
         # Standard errors
         X_hat = PZ @ X
         XtX_hat_inv = np.linalg.inv(X_hat.T @ X_hat)
 
         # For k-class estimators, use Q^{-1} instead of (X_hat'X_hat)^{-1}
-        if kclass_kappa is not None:
+        # CUE unadjusted is equivalent to LIML in coefficients but uses
+        # 2SLS-style VCE (XtX_hat_inv) rather than k-class VCE.
+        if kclass_kappa is not None and estimator != "cue":
             Q_kclass = X.T @ (np.eye(n) - kclass_kappa * MZ) @ X
             try:
                 Q_kclass_inv = np.linalg.inv(Q_kclass)
@@ -144,18 +152,23 @@ class IVModel(BaseModel):
                 meat = X.T @ Z @ S_bread_inv @ S_meat @ S_bread_inv @ Z.T @ X
                 var_beta = XZSiZ_inv @ meat @ XZSiZ_inv
         elif estimator == "cue":
-            # CUE VCE: use own residuals for S
-            S = (Z.T * resid ** 2) @ Z / n
-            try:
-                S_inv = np.linalg.inv(S)
-            except np.linalg.LinAlgError:
-                S_inv = np.linalg.pinv(S)
-            XZWSZX = X.T @ Z @ S_inv @ Z.T @ X
-            try:
-                var_beta = np.linalg.inv(XZWSZX)
-            except np.linalg.LinAlgError:
+            if vce == "unadjusted":
+                # Homoskedastic CUE: same VCE as 2SLS with CUE residuals
                 sigma2 = resid @ resid / n
                 var_beta = sigma2 * XtX_hat_inv
+            else:
+                # CUE VCE: use own residuals for S (no /n division)
+                S = (Z.T * resid ** 2) @ Z
+                try:
+                    S_inv = np.linalg.inv(S)
+                except np.linalg.LinAlgError:
+                    S_inv = np.linalg.pinv(S)
+                XZWSZX = X.T @ Z @ S_inv @ Z.T @ X
+                try:
+                    var_beta = np.linalg.inv(XZWSZX)
+                except np.linalg.LinAlgError:
+                    sigma2 = resid @ resid / n
+                    var_beta = sigma2 * XtX_hat_inv
         elif vce == "unadjusted":
             sigma2 = resid @ resid / n
             V_inv = Q_kclass_inv if Q_kclass_inv is not None else XtX_hat_inv
@@ -163,11 +176,13 @@ class IVModel(BaseModel):
         elif vce == "robust":
             e2 = resid ** 2
             meat = (X_hat.T * e2) @ X_hat
-            var_beta = XtX_hat_inv @ meat @ XtX_hat_inv
+            bread_inv = Q_kclass_inv if Q_kclass_inv is not None else XtX_hat_inv
+            var_beta = bread_inv @ meat @ bread_inv
         elif vce == "cluster":
             clust_cols = cluster if isinstance(cluster, list) else [cluster]
+            bread_inv = Q_kclass_inv if Q_kclass_inv is not None else XtX_hat_inv
             var_beta = self._cluster_vce(
-                X_hat, resid, n, k, XtX_hat_inv, df, clust_cols
+                X_hat, resid, n, k, bread_inv, df, clust_cols
             )
 
         std_err = np.sqrt(np.maximum(np.diag(var_beta), 0))
@@ -187,17 +202,36 @@ class IVModel(BaseModel):
 
         # Overidentification J test
         if L > K_endog:
-            sigma2_hat = SSR / n
-            j_stat = float(resid @ PZ @ resid / sigma2_hat)
             j_df = L - K_endog
+            if estimator == "gmm":
+                # Hansen J: n * g_bar' W g_bar = Ze' W Ze / n
+                S_gmm = (Z.T * resid ** 2) @ Z / n
+                try:
+                    W_gmm = np.linalg.inv(S_gmm)
+                except np.linalg.LinAlgError:
+                    W_gmm = np.linalg.pinv(S_gmm)
+                Ze = Z.T @ resid
+                j_stat = float(Ze @ W_gmm @ Ze) / n
+            elif estimator == "cue":
+                S_cue = (Z.T * resid ** 2) @ Z / n
+                try:
+                    W_cue = np.linalg.inv(S_cue)
+                except np.linalg.LinAlgError:
+                    W_cue = np.linalg.pinv(S_cue)
+                Ze = Z.T @ resid
+                j_stat = float(Ze @ W_cue @ Ze) / n
+            else:
+                # Sargan statistic for 2SLS/LIML/k-class
+                sigma2_hat = SSR / n
+                j_stat = float(resid @ PZ @ resid / sigma2_hat)
             j_pval = float(1 - sp_stats.chi2.cdf(j_stat, j_df))
         else:
             j_stat = None
             j_pval = None
 
         # DWH endogeneity test
-        endog_test_stat, endog_test_pval = self._dwh_test(
-            y_vec, X, Z, PZ, n, k, n_endog
+        endog_test_stat, endog_test_pval, wh_f, wh_pval = self._dwh_test(
+            y_vec, X, Z, PZ, n, k, n_endog, n_exog, is_con
         )
 
         vce_label = vce
@@ -220,6 +254,7 @@ class IVModel(BaseModel):
             idstat=idstat, idpval=idpval,
             widstat=first_stage_f,
             kappa=kclass_kappa,
+            var_beta=var_beta,
         )
 
     # ── Estimators ──
@@ -301,8 +336,10 @@ class IVModel(BaseModel):
             Ze = Z.T @ resid
             return float(Ze @ W @ Ze) / n
 
-        res = minimize(cue_objective, beta_init, method='L-BFGS-B',
-                       options={'maxiter': 500, 'ftol': 1e-12})
+        # Use Nelder-Mead for robust global convergence
+        res = minimize(cue_objective, beta_init, method='Nelder-Mead',
+                       options={'maxiter': 5000, 'xatol': 1e-12, 'fatol': 1e-12,
+                                'adaptive': True})
         beta = res.x
         resid = y - X @ beta
         return beta, resid
@@ -346,30 +383,56 @@ class IVModel(BaseModel):
 
     # ── Diagnostics ──
 
-    def _anderson_lm(self, X2, Z, n, L):
-        """Anderson (1951) canonical correlations LM test for underidentification."""
+    def _anderson_lm(self, X2, Z, Z_inst, n, L, is_con, n_exog):
+        """Anderson (1951) canonical correlations LM test for underidentification.
+
+        Uses partial R2: regress endogenous on full Z, compare to regressing
+        on exogenous only (Stata estat firststage convention).
+        """
         k_Z = Z.shape[1]
         ZtZ_inv = np.linalg.inv(Z.T @ Z)
 
         if X2.shape[1] == 1:
-            # Single endogenous: canonical correlation squared
             y_j = X2[:, 0]
+            # Full model: y_j on Z (exog + excluded instruments)
             beta_j = ZtZ_inv @ Z.T @ y_j
             resid_j = y_j - Z @ beta_j
-            SSR = resid_j @ resid_j
-            SST = (y_j - np.mean(y_j)) @ (y_j - np.mean(y_j))
-            r2 = 1 - SSR / SST if SST > 0 else 0.0
-            # LM = n * min canonical correlation^2
-            cc2 = max(r2, 0)
-            lm_stat = float(n * cc2)
+            SSR_full = resid_j @ resid_j
+
+            # Restricted model: y_j on exogenous only
+            if is_con:
+                if n_exog > 0:
+                    Z_exog = Z[:, :1 + n_exog]
+                else:
+                    Z_exog = Z[:, :1]
+            else:
+                if n_exog > 0:
+                    Z_exog = Z[:, :n_exog]
+                else:
+                    SST = (y_j - np.mean(y_j)) @ (y_j - np.mean(y_j))
+                    cc2 = 1.0 if SST > 0 else 0.0
+                    lm_stat = float(n * cc2)
+                    df_test = max(L, 1)
+                    pval = float(1 - sp_stats.chi2.cdf(lm_stat, df_test))
+                    return lm_stat, pval
+
+            if Z_exog.shape[1] > 0:
+                beta_r = np.linalg.inv(Z_exog.T @ Z_exog) @ Z_exog.T @ y_j
+                resid_r = y_j - Z_exog @ beta_r
+                SSR_r = resid_r @ resid_r
+            else:
+                SSR_r = (y_j - np.mean(y_j)) @ (y_j - np.mean(y_j))
+
+            partial_r2 = 1 - SSR_full / SSR_r if SSR_r > 0 else 0.0
+            lm_stat = float(n * partial_r2)
         else:
             # Multiple endogenous: use smallest canonical correlation
-            # CCA between X2 and Z
+            # CCA between X2 and Z_inst (excluded instruments only)
+            Z_inst_c = Z_inst - Z_inst.mean(axis=0)
             X2_c = X2 - X2.mean(axis=0)
-            Z_c = Z - Z.mean(axis=0)
-            C = X2_c.T @ Z_c / n
+            C = X2_c.T @ Z_inst_c / n
             Vx = np.linalg.pinv(X2_c.T @ X2_c / n)
-            Vz = np.linalg.pinv(Z_c.T @ Z_c / n)
+            Vz = np.linalg.pinv(Z_inst_c.T @ Z_inst_c / n)
             M = Vx @ C @ Vz @ C.T
             try:
                 eigvals = np.sort(np.real(np.linalg.eigvals(M)))
@@ -382,9 +445,10 @@ class IVModel(BaseModel):
         pval = float(1 - sp_stats.chi2.cdf(lm_stat, df_test))
         return lm_stat, pval
 
-    def _first_stage_fstat(self, X2, Z, is_con, n):
-        """Cragg-Donald F (minimum eigenvalue-based for multiple endog)."""
+    def _first_stage_fstat(self, X2, Z, Z_inst, is_con, n, n_exog):
+        """First-stage F for excluded instruments (Stata estat firststage)."""
         k_Z = Z.shape[1]
+        L = Z_inst.shape[1]
         ZtZ_inv = np.linalg.inv(Z.T @ Z)
 
         f_stats = []
@@ -392,19 +456,38 @@ class IVModel(BaseModel):
             y_j = X2[:, j]
             beta_j = ZtZ_inv @ Z.T @ y_j
             resid_j = y_j - Z @ beta_j
-            SSR_j = resid_j @ resid_j
-            SST_j = (y_j - np.mean(y_j)) @ (y_j - np.mean(y_j))
-            SSE_j = SST_j - SSR_j
-            df_model = k_Z - 1 if is_con else k_Z
+            SSR_j = float(np.dot(resid_j, resid_j))
+
+            # Restricted model: y_j on exogenous only (no excluded instruments)
+            if is_con:
+                if n_exog > 0:
+                    Z_exog = Z[:, :1 + n_exog]
+                else:
+                    Z_exog = Z[:, :1]
+            else:
+                if n_exog > 0:
+                    Z_exog = Z[:, :n_exog]
+                else:
+                    f_stats.append(0.0)
+                    continue
+
+            if Z_exog.shape[1] > 0:
+                beta_r = np.linalg.inv(Z_exog.T @ Z_exog) @ Z_exog.T @ y_j
+                resid_r = y_j - Z_exog @ beta_r
+                SSR_r = float(np.dot(resid_r, resid_r))
+            else:
+                SSR_r = float(np.dot(y_j - np.mean(y_j), y_j - np.mean(y_j)))
+
+            df_excl = L
             df_resid = n - k_Z
-            if df_model > 0 and df_resid > 0:
-                f_j = (SSE_j / df_model) / (SSR_j / df_resid)
+            if df_excl > 0 and df_resid > 0:
+                f_j = ((SSR_r - SSR_j) / df_excl) / (SSR_j / df_resid)
             else:
                 f_j = 0.0
             f_stats.append(f_j)
         return min(f_stats) if f_stats else 0.0
 
-    def _cluster_vce(self, X_hat, resid, n, k, XtX_hat_inv, df, cluster_cols):
+    def _cluster_vce(self, X_hat, resid, n, k, bread_inv, df, cluster_cols):
         """Cluster-robust VCE."""
         clust_arr = df[cluster_cols[0]].values if len(cluster_cols) == 1 \
             else self._intersect_clusters(df, cluster_cols)
@@ -415,9 +498,7 @@ class IVModel(BaseModel):
             Xc = X_hat[idx]
             ec = resid[idx]
             meat += Xc.T @ np.outer(ec, ec) @ Xc
-        N_g = len(unique_clusts)
-        adj = (N_g / (N_g - 1)) * ((n - 1) / (n - k))
-        return adj * XtX_hat_inv @ meat @ XtX_hat_inv
+        return bread_inv @ meat @ bread_inv
 
     @staticmethod
     def _intersect_clusters(df, cluster_cols):
@@ -428,30 +509,54 @@ class IVModel(BaseModel):
         _, codes = np.unique(combined, return_inverse=True)
         return codes
 
-    def _dwh_test(self, y, X, Z, PZ, n, k, n_endog):
+    def _dwh_test(self, y, X, Z, PZ, n, k, n_endog, n_exog, is_con):
+        """Durbin score and Wu-Hausman endogeneity tests.
+
+        Returns Durbin (score) chi2 statistic and p-value.
+        Wu-Hausman F is stored separately if needed.
+        """
+        # Step 1: OLS of y on X
         XtX_inv = np.linalg.inv(X.T @ X)
         beta_ols = XtX_inv @ X.T @ y
-        X_hat = PZ @ X
-        XtX_hat_inv = np.linalg.inv(X_hat.T @ X_hat)
-        beta_iv = XtX_hat_inv @ X_hat.T @ y
         resid_ols = y - X @ beta_ols
-        sigma2_ols = resid_ols @ resid_ols / (n - k)
-        V_ols = sigma2_ols * XtX_inv
-        resid_iv = y - X @ beta_iv
-        sigma2_iv = resid_iv @ resid_iv / (n - k)
-        V_iv = sigma2_iv * XtX_hat_inv
-        V_diff = V_iv - V_ols
-        diff = beta_iv - beta_ols
+        SSR_ols = resid_ols @ resid_ols
+
+        # Step 2: First-stage residuals for each endogenous variable
+        ZtZ_inv = np.linalg.inv(Z.T @ Z)
+        # Extract endogenous columns from X
+        X_endog = X[:, :n_endog]
+        V_hat = np.empty((n, n_endog))
+        for j in range(n_endog):
+            gamma_j = ZtZ_inv @ Z.T @ X_endog[:, j]
+            V_hat[:, j] = X_endog[:, j] - Z @ gamma_j
+
+        # Step 3: Augmented regression: y on X + V_hat
+        X_aug = np.column_stack([X, V_hat])
         try:
-            chi2 = float(diff.T @ np.linalg.solve(V_diff, diff))
-        except Exception:
-            try:
-                chi2 = float(diff.T @ np.linalg.pinv(V_diff) @ diff)
-            except Exception:
-                return 0.0, 1.0
-        chi2 = max(chi2, 0)
-        pval = float(1 - sp_stats.chi2.cdf(chi2, n_endog)) if n_endog > 0 else 1.0
-        return chi2, pval
+            XtX_aug_inv = np.linalg.inv(X_aug.T @ X_aug)
+        except np.linalg.LinAlgError:
+            XtX_aug_inv = np.linalg.pinv(X_aug.T @ X_aug)
+        beta_aug = XtX_aug_inv @ X_aug.T @ y
+        resid_aug = y - X_aug @ beta_aug
+        SSR_aug = resid_aug @ resid_aug
+
+        # Durbin score test: n * (SSR_ols - SSR_aug) / SSR_ols
+        m = n_endog
+        durbin_chi2 = float(n * (SSR_ols - SSR_aug) / SSR_ols)
+        durbin_chi2 = max(durbin_chi2, 0.0)
+        durbin_pval = float(1 - sp_stats.chi2.cdf(durbin_chi2, m))
+
+        # Wu-Hausman F test
+        df_den = n - k - m
+        if df_den > 0:
+            wh_f = float(((SSR_ols - SSR_aug) / m) / (SSR_aug / df_den))
+            wh_f = max(wh_f, 0.0)
+            wh_pval = float(1 - sp_stats.f.cdf(wh_f, m, df_den))
+        else:
+            wh_f = 0.0
+            wh_pval = 1.0
+
+        return durbin_chi2, durbin_pval, wh_f, wh_pval
 
     def estimate(self, df, x, **kwargs):
         raise NotImplementedError("Use fit() for IV estimation")

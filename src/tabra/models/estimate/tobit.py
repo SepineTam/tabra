@@ -18,8 +18,8 @@ from tabra.results.tobit_result import TobitResult
 class TobitModel(BaseModel):
     """Tobit (censored regression) model estimated via MLE."""
 
-    def fit(self, df, y, x, ll=None, ul=None, is_con=True,
-            max_iter=200, tol=1e-8):
+    def fit(self, df, y, x, ll=None, ul=None, vce="unadjusted",
+            is_con=True, max_iter=200, tol=1e-8):
         """Fit a Tobit censored regression model via MLE.
 
         Args:
@@ -93,6 +93,11 @@ class TobitModel(BaseModel):
 
         # Step 3: Standard errors via numerical Hessian
         V = self._compute_vce(params, y_vec, X, n, ll, ul, k)
+        if vce == "robust":
+            scores = self._compute_obs_scores(
+                params, y_vec, X, n, ll, ul, k)
+            B = scores.T @ scores
+            V = V @ B @ V
         std_err = np.sqrt(np.abs(np.diag(V)))
         se_beta = std_err[:k]
         se_lnsigma = std_err[k]
@@ -234,7 +239,7 @@ class TobitModel(BaseModel):
 
     def _compute_vce(self, params, y, X, n, ll, ul, k):
         """Compute variance-covariance matrix via numerical Hessian."""
-        eps = 1e-5
+        eps_vec = np.maximum(np.abs(params) * 1e-5, 1e-8)
         p = len(params)
         hess = np.zeros((p, p))
 
@@ -244,13 +249,13 @@ class TobitModel(BaseModel):
             for j in range(i, p):
                 ei = np.zeros(p)
                 ej = np.zeros(p)
-                ei[i] = eps
-                ej[j] = eps
+                ei[i] = eps_vec[i]
+                ej[j] = eps_vec[j]
                 f_pp = self._neg_log_lik(params + ei + ej, y, X, n, ll, ul)
                 f_pm = self._neg_log_lik(params + ei - ej, y, X, n, ll, ul)
                 f_mp = self._neg_log_lik(params - ei + ej, y, X, n, ll, ul)
                 f_mm = self._neg_log_lik(params - ei - ej, y, X, n, ll, ul)
-                hess[i, j] = (f_pp - f_pm - f_mp + f_mm) / (4 * eps * eps)
+                hess[i, j] = (f_pp - f_pm - f_mp + f_mm) / (4 * eps_vec[i] * eps_vec[j])
                 hess[j, i] = hess[i, j]
 
         try:
@@ -259,6 +264,49 @@ class TobitModel(BaseModel):
             V = np.eye(p) * np.nan
 
         return V
+
+    def _compute_obs_scores(self, params, y, X, n, ll, ul, k):
+        """Compute observation-level score vectors for robust VCE."""
+        beta = params[:k]
+        sigma = np.exp(params[k])
+        xb = X @ beta
+        p_total = k + 1
+        scores = np.zeros((n, p_total))
+
+        if ll is not None:
+            left_censored = y <= ll
+        else:
+            left_censored = np.zeros(n, dtype=bool)
+        if ul is not None:
+            right_censored = y >= ul
+        else:
+            right_censored = np.zeros(n, dtype=bool)
+        uncensored = ~left_censored & ~right_censored
+
+        # Uncensored: d(ll_i)/d(beta) = x_i * resid_i / sigma^2
+        #             d(ll_i)/d(ln_sigma) = -1 + resid_i^2 / sigma^2
+        if np.any(uncensored):
+            resid = y[uncensored] - xb[uncensored]
+            scores[uncensored, :k] = X[uncensored] * (resid / sigma ** 2)[:, np.newaxis]
+            scores[uncensored, k] = -1 + (resid / sigma) ** 2
+
+        # Left-censored: lambda = phi(z) / Phi(z), z = (ll - xb) / sigma
+        if np.any(left_censored):
+            z_lc = (ll - xb[left_censored]) / sigma
+            z_lc = np.clip(z_lc, -30, 30)
+            lambda_lc = sp_stats.norm.pdf(z_lc) / (sp_stats.norm.cdf(z_lc) + 1e-300)
+            scores[left_censored, :k] = -X[left_censored] * (lambda_lc / sigma)[:, np.newaxis]
+            scores[left_censored, k] = -z_lc * lambda_lc
+
+        # Right-censored: lambda = phi(z) / (1 - Phi(z)), z = (ul - xb) / sigma
+        if np.any(right_censored):
+            z_rc = (ul - xb[right_censored]) / sigma
+            z_rc = np.clip(z_rc, -30, 30)
+            lambda_rc = sp_stats.norm.pdf(z_rc) / (1 - sp_stats.norm.cdf(z_rc) + 1e-300)
+            scores[right_censored, :k] = X[right_censored] * (lambda_rc / sigma)[:, np.newaxis]
+            scores[right_censored, k] = -z_rc * lambda_rc
+
+        return scores
 
     def estimate(self, df, x, **kwargs):
         raise NotImplementedError("Use fit() for tobit estimation")

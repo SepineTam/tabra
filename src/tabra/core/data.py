@@ -278,7 +278,7 @@ class TabraData:
         return result
 
     def tobit(self, y: str, x: list[str], ll=None, ul=None,
-              is_con: bool = True):
+              vce: str = "unadjusted", is_con: bool = True):
         """Fit a Tobit censored regression model.
 
         Args:
@@ -286,6 +286,7 @@ class TabraData:
             x (list[str]): Independent variable names.
             ll (float): Left-censoring limit. Default None (no censoring).
             ul (float): Right-censoring limit. Default None (no censoring).
+            vce (str): Variance-covariance estimator type. "unadjusted" or "robust".
             is_con (bool): Whether to include a constant term. Default True.
 
         Returns:
@@ -296,7 +297,7 @@ class TabraData:
             >>> result = dta.tobit("price", ["weight", "mpg"], ll=0)
         """
         model = TobitModel()
-        result = model.fit(self._df, y, x, ll=ll, ul=ul, is_con=is_con)
+        result = model.fit(self._df, y, x, ll=ll, ul=ul, vce=vce, is_con=is_con)
         result.set_style(self._style)
         self._result = result
         if self._is_display_result:

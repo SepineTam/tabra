@@ -199,3 +199,164 @@ class TestIVProbitEdgeCases:
                 ivprobit_data, y="y", exog=["x2"],
                 endog=["x1"], instruments=[], method="mle"
             )
+
+
+# ---------------------------------------------------------------------------
+# Stata cross-validation: every scalar must match Stata output to at least
+# 1e-4 relative tolerance (last-decimal rounding only).
+# ---------------------------------------------------------------------------
+
+class TestIVProbitStataCrossValidation:
+    """Stata 17 ivprobit baseline cross-validation (seed 42, n=500)."""
+
+    @pytest.fixture(scope="class")
+    def data(self):
+        np.random.seed(42)
+        n = 500
+        z1 = np.random.randn(n)
+        z2 = np.random.randn(n)
+        x2 = np.random.randn(n)
+        rho = 0.6
+        cov = np.array([[1, rho], [rho, 1]])
+        errors = np.random.multivariate_normal([0, 0], cov, n)
+        eps = errors[:, 0]
+        v = errors[:, 1]
+        x1 = 0.5 * z1 + 0.3 * z2 + v
+        y_star = -0.5 + 1.0 * x1 + 1.5 * x2 + eps
+        y = (y_star > 0).astype(float)
+        return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "z1": z1, "z2": z2})
+
+    # ---- MLE default ----
+    def test_mle_default_coef(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        assert r.var_names == ["x1", "x2", "_cons"]
+        np.testing.assert_allclose(r.coef,
+                                   [1.113627, 1.550236, -0.430839], rtol=1e-5)
+
+    def test_mle_default_se(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.std_err,
+                                   [0.2246492, 0.1839215, 0.0950356], rtol=1e-5)
+
+    def test_mle_default_z(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.z_stat,
+                                   [4.957181, 8.428791, -4.533445], rtol=1e-5)
+
+    def test_mle_default_p(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.p_value,
+                                   [7.152339e-07, 0.0, 5.802939e-06], rtol=1e-5)
+
+    def test_mle_default_rho(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.rho, 0.5975633, rtol=1e-5)
+        np.testing.assert_allclose(r.rho_se, 0.1006255, rtol=1e-5)
+
+    def test_mle_default_ll_chi2(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.ll, -803.26182, rtol=1e-5)
+        np.testing.assert_allclose(r.chi2, 84.69, rtol=1e-3)
+
+    def test_mle_default_endog_test(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.endog_test_stat, 19.40, rtol=1e-3)
+        np.testing.assert_allclose(r.endog_test_pval, 0.0, atol=1e-4)
+
+    # ---- MLE robust ----
+    def test_mle_robust_coef(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="robust"
+        )
+        np.testing.assert_allclose(r.coef,
+                                   [1.113627, 1.550236, -0.430839], rtol=1e-5)
+
+    def test_mle_robust_se(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="robust"
+        )
+        np.testing.assert_allclose(r.std_err,
+                                   [0.2335241, 0.1824299, 0.0972864], rtol=1e-5)
+
+    def test_mle_robust_chi2(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="robust"
+        )
+        np.testing.assert_allclose(r.chi2, 94.30, rtol=1e-3)
+
+    def test_mle_robust_endog_test(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="mle", vce="robust"
+        )
+        np.testing.assert_allclose(r.endog_test_stat, 21.83, rtol=1e-3)
+
+    # ---- twostep ----
+    def test_twostep_coef(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="twostep", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.coef,
+                                   [1.387155, 1.921722, -0.534330], rtol=1e-5)
+
+    def test_twostep_se(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="twostep", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.std_err,
+                                   [0.1962004, 0.1955903, 0.1117416], rtol=1e-5)
+
+    def test_twostep_chi2(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="twostep", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.chi2, 101.17, rtol=1e-3)
+
+    def test_twostep_endog_test(self, data):
+        from tabra.models.estimate.ivprobit import IVProbitModel
+        r = IVProbitModel().fit(
+            data, y="y", exog=["x2"], endog=["x1"],
+            instruments=["z1", "z2"], method="twostep", vce="unadjusted"
+        )
+        np.testing.assert_allclose(r.endog_test_stat, 15.74, rtol=1e-3)
