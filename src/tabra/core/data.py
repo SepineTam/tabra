@@ -62,6 +62,10 @@ class TabraData:
         return self._config
 
     @property
+    def setting(self) -> Config:
+        return self._config
+
+    @property
     def plot(self) -> PlotOps:
         return PlotOps(self)
 

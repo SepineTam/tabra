@@ -20,6 +20,7 @@ class Config:
         self._plot_template = TEMPLATES["DEFAULT"]
         self._auto_create_missing_dir = True
         self._figure_save_base = Path.cwd()
+        self._plot_block = True
 
     def set_plot_template(self, template: PlotTemplateBase):
         """Set the plot template.
@@ -71,6 +72,25 @@ class Config:
             Config: Returns self for method chaining.
         """
         self._figure_save_base = Path(path)
+        return self
+
+    def plot(self, block: bool = None):
+        """Configure plot display settings.
+
+        Args:
+            block (bool): If True, ``plt.show()`` blocks until the window
+                is closed. If False, shows the figure without blocking.
+                Default True.
+
+        Returns:
+            Config: Returns self for method chaining.
+
+        Example:
+            >>> dta = load_data("auto")
+            >>> dta.setting.plot(block=False)
+        """
+        if block is not None:
+            self._plot_block = block
         return self
 
 

@@ -89,7 +89,10 @@ class TabraFigure:
         Returns:
             TabraFigure: Returns self for method chaining.
         """
-        plt.show()
+        block = True
+        if self._tabra is not None:
+            block = getattr(self._tabra._config, "_plot_block", True)
+        plt.show(block=block)
         return self
 
     def close(self):

@@ -16,6 +16,9 @@ dependencies = [
     "statsmodels>=0.14.6",
 ]
 
+[project.optional-dependencies]
+all = ["psutil>=5.9.0"]
+
 [project.scripts]
 tabra = "tabra:main"
 

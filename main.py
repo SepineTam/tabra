@@ -11,10 +11,14 @@ tab = load_data(pd.read_stata(
     storage_options={"User-Agent": "Mozilla/5.0"}
 ))
 
+tab.about()
+
+tab.setting.plot(block=False)
+
 tab.data.sum()
 tab.data.gen("p__sq", "price ^ 2")
 
-tab.reghdfe("price", ["mpg", "weight"], absorb=["rep78"])
+tab.est.reghdfe("price", ["mpg", "weight"], absorb=["rep78"])
 
 tab.plot.hist(
     "p__sq",
@@ -33,8 +37,8 @@ mix_figure = tab.plot.mix(
     template=AER
 ).show()
 
-tab.reg("price", ["mpg", "weight"])
+tab.est.reg("price", ["mpg", "weight"])
 tab.plot.coefplot().save(".local/figs/demo_coefplot", formats=["pdf"])
 
 tab.xtset("foreign")
-tab.xtreg("price", ["mpg", "weight"], model="fe")
+tab.est.xtreg("price", ["mpg", "weight"], model="fe")
