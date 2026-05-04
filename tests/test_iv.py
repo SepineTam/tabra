@@ -248,7 +248,7 @@ class TestIVAPI:
         y = 1.0 + 2.0 * x1 + 1.5 * x2 + u
         df = pd.DataFrame({"y": y, "x1": x1, "x2": x2, "z1": z1, "z2": z2})
         tab = TabraData(df, is_display_result=False)
-        result = tab.ivreg(
+        result = tab.est.ivreg(
             "y", exog=["x2"], endog=["x1"], iv=["z1", "z2"],
             estimator="2sls"
         )

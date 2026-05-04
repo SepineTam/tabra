@@ -508,7 +508,7 @@ class TestTobitTabraDataIntegration:
         from tabra.core.data import TabraData
         d = synthetic_tobit_data
         tab = TabraData(d["df"], is_display_result=False)
-        result = tab.tobit("y", ["x1", "x2"], ll=d["ll"])
+        result = tab.est.tobit("y", ["x1", "x2"], ll=d["ll"])
 
         assert result is not None
         assert result.n_obs == 300
@@ -518,7 +518,7 @@ class TestTobitTabraDataIntegration:
         from tabra.core.data import TabraData
         d = synthetic_two_limit_data
         tab = TabraData(d["df"], is_display_result=False)
-        result = tab.tobit("y", ["x1", "x2"], ll=d["ll"], ul=d["ul"])
+        result = tab.est.tobit("y", ["x1", "x2"], ll=d["ll"], ul=d["ul"])
 
         assert result is not None
         assert result.n_obs == 300
@@ -527,7 +527,7 @@ class TestTobitTabraDataIntegration:
         from tabra.core.data import TabraData
         d = synthetic_tobit_data
         tab = TabraData(d["df"], is_display_result=False)
-        result = tab.tobit("y", ["x1", "x2"], ll=d["ll"])
+        result = tab.est.tobit("y", ["x1", "x2"], ll=d["ll"])
         summary = result.summary()
 
         assert "Tobit regression" in summary

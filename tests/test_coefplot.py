@@ -308,13 +308,13 @@ class TestCoefplotIntegration:
         return load_data(df, is_display_result=False)
 
     def test_via_plotops(self, dta):
-        r = dta.reg("price", ["mpg", "weight"])
+        r = dta.est.reg("price", ["mpg", "weight"])
         fig = dta.plot.coefplot(r)
         assert isinstance(fig, TabraFigure)
         fig.close()
 
     def test_via_plotops_auto_result(self, dta):
-        dta.reg("price", ["mpg", "weight"])
+        dta.est.reg("price", ["mpg", "weight"])
         fig = dta.plot.coefplot()
         assert isinstance(fig, TabraFigure)
         fig.close()
@@ -325,8 +325,8 @@ class TestCoefplotIntegration:
             dta.plot.coefplot()
 
     def test_multi_model_via_plotops(self, dta):
-        r1 = dta.reg("price", ["mpg", "weight"])
-        r2 = dta.reg("price", ["mpg", "weight", "length"])
+        r1 = dta.est.reg("price", ["mpg", "weight"])
+        r2 = dta.est.reg("price", ["mpg", "weight", "length"])
         fig = dta.plot.coefplot([r1, r2], labels=["Base", "Full"])
         assert isinstance(fig, TabraFigure)
         fig.close()

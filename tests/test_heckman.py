@@ -456,7 +456,7 @@ class TestHeckmanTabraDataIntegration:
         df = synthetic_heckman_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.heckman("y", ["x1", "x2"], select_x=["z1", "z2"])
+        result = tab.est.heckman("y", ["x1", "x2"], select_x=["z1", "z2"])
 
         assert result is not None
         assert result.n_obs == 500
@@ -467,7 +467,7 @@ class TestHeckmanTabraDataIntegration:
         df = synthetic_heckman_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.heckman("y", ["x1", "x2"], select_x=["z1", "z2"],
+        result = tab.est.heckman("y", ["x1", "x2"], select_x=["z1", "z2"],
                              method="twostep")
 
         assert result is not None
@@ -479,7 +479,7 @@ class TestHeckmanTabraDataIntegration:
         df = synthetic_heckman_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.heckman("y", ["x1", "x2"], select_x=["z1", "z2"])
+        result = tab.est.heckman("y", ["x1", "x2"], select_x=["z1", "z2"])
         summary = result.summary()
 
         assert "Heckman selection model" in summary
@@ -494,7 +494,7 @@ class TestHeckmanTabraDataIntegration:
         df = synthetic_heckman_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.heckman("y", ["x1", "x2"], select_x=["z1", "z2"])
+        result = tab.est.heckman("y", ["x1", "x2"], select_x=["z1", "z2"])
 
         summary = result.summary()
         assert isinstance(summary, str)

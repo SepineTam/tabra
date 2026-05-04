@@ -407,14 +407,14 @@ class TestTabraDataGLM:
     def test_tabradata_glm(self, gaussian_data):
         from tabra.core.data import TabraData
         tab = TabraData(gaussian_data, is_display_result=False)
-        result = tab.glm("y", ["x1", "x2"], family="gaussian", link="identity")
+        result = tab.est.glm("y", ["x1", "x2"], family="gaussian", link="identity")
         assert result is not None
         assert result.n_obs == 200
 
     def test_tabradata_glm_summary(self, gaussian_data):
         from tabra.core.data import TabraData
         tab = TabraData(gaussian_data, is_display_result=False)
-        result = tab.glm("y", ["x1", "x2"], family="gaussian", link="identity")
+        result = tab.est.glm("y", ["x1", "x2"], family="gaussian", link="identity")
         summary = result.summary()
         assert "GLM" in summary
         assert "Number of obs" in summary

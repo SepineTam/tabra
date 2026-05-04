@@ -194,7 +194,7 @@ def test_xtset_then_xtreg(fe_data):
 
     tab = TabraData(fe_data["df"], is_display_result=False)
     tab.xtset("group")
-    result = tab.xtreg("y", ["x1", "x2"], model="fe")
+    result = tab.est.xtreg("y", ["x1", "x2"], model="fe")
     k = fe_data["k"]
     assert np.allclose(result.coef[:k], fe_data["beta_oracle"], atol=1e-8)
 
@@ -205,7 +205,7 @@ def test_xtreg_without_xtset_raises(fe_data):
 
     tab = TabraData(fe_data["df"])
     with pytest.raises(ValueError, match="xtset"):
-        tab.xtreg("y", ["x1", "x2"], model="fe")
+        tab.est.xtreg("y", ["x1", "x2"], model="fe")
 
 
 # ============ BE (Between Estimator) ============

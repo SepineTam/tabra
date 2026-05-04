@@ -151,7 +151,7 @@ class TestIVReg2API:
     def test_ivreg2_api(self, iv_data):
         from tabra.core.data import TabraData
         tab = TabraData(iv_data, is_display_result=False)
-        result = tab.ivreg2(
+        result = tab.est.ivreg2(
             "y", exog=["x2"], endog=["x1"], iv=["z1", "z2", "z3"],
             estimator="2sls"
         )
@@ -161,7 +161,7 @@ class TestIVReg2API:
     def test_ivreg2_cue_api(self, iv_data):
         from tabra.core.data import TabraData
         tab = TabraData(iv_data, is_display_result=False)
-        result = tab.ivreg2(
+        result = tab.est.ivreg2(
             "y", exog=["x2"], endog=["x1"], iv=["z1", "z2", "z3"],
             estimator="cue"
         )
@@ -170,7 +170,7 @@ class TestIVReg2API:
     def test_ivreg2_cluster_api(self, iv_data):
         from tabra.core.data import TabraData
         tab = TabraData(iv_data, is_display_result=False)
-        result = tab.ivreg2(
+        result = tab.est.ivreg2(
             "y", exog=["x2"], endog=["x1"], iv=["z1", "z2", "z3"],
             vce="cluster", cluster=["cluster_id"]
         )

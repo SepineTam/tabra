@@ -14,7 +14,7 @@ def tab():
 class TestRvfplot:
     def test_after_ols(self, tab):
         """rvfplot works after OLS regression."""
-        tab.reg(y="price", x=["mpg", "weight"])
+        tab.est.reg(y="price", x=["mpg", "weight"])
         fig = tab.plot.rvfplot()
         assert isinstance(fig, TabraFigure)
         ax = fig.figure.axes[0]
@@ -28,7 +28,7 @@ class TestRvfplot:
 
     def test_labels(self, tab):
         """rvfplot has correct default axis labels."""
-        tab.reg(y="price", x=["mpg", "weight"])
+        tab.est.reg(y="price", x=["mpg", "weight"])
         fig = tab.plot.rvfplot()
         ax = fig.figure.axes[0]
         assert "itted" in ax.get_xlabel().lower()
@@ -37,7 +37,7 @@ class TestRvfplot:
 
     def test_custom_title(self, tab):
         """rvfplot respects custom title."""
-        tab.reg(y="price", x=["mpg", "weight"])
+        tab.est.reg(y="price", x=["mpg", "weight"])
         fig = tab.plot.rvfplot(title="Residual Diagnostics")
         ax = fig.figure.axes[0]
         assert ax.get_title() == "Residual Diagnostics"
@@ -59,7 +59,7 @@ class TestRvfplot:
     def test_with_template(self, tab):
         """rvfplot respects template settings."""
         from tabra.plot.templates import AER
-        tab.reg(y="price", x=["mpg", "weight"])
+        tab.est.reg(y="price", x=["mpg", "weight"])
         fig = tab.plot.rvfplot(template=AER)
         assert isinstance(fig, TabraFigure)
         fig.close()

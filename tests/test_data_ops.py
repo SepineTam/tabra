@@ -54,7 +54,7 @@ class TestDataOpsGen:
     def test_gen_available_in_regression(self, data_ops_df):
         tab = load_data(data_ops_df, is_display_result=False)
         tab.data.gen("c", "a * 2 + b + 1")
-        reg_result = tab.reg("c", ["a"], is_con=False)
+        reg_result = tab.est.reg("c", ["a"], is_con=False)
         assert reg_result is not None
 
     def test_gen_power_caret(self, data_ops_df):

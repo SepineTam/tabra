@@ -421,7 +421,7 @@ class TestTabraDataIntegration:
         df = synthetic_binary_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.probit("y", ["x1", "x2"])
+        result = tab.est.probit("y", ["x1", "x2"])
 
         assert result is not None
         assert result.n_obs == 200
@@ -432,7 +432,7 @@ class TestTabraDataIntegration:
         df = synthetic_binary_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.logit("y", ["x1", "x2"])
+        result = tab.est.logit("y", ["x1", "x2"])
 
         assert result is not None
         assert result.n_obs == 200
@@ -443,7 +443,7 @@ class TestTabraDataIntegration:
         df = synthetic_binary_data["df"]
 
         tab = TabraData(df, is_display_result=False)
-        result = tab.probit("y", ["x1", "x2"])
+        result = tab.est.probit("y", ["x1", "x2"])
         summary = result.summary()
 
         assert "Probit regression" in summary

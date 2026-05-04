@@ -104,7 +104,7 @@ class TestAnovaAlignment:
         price = 1000 + 2 * weight - 50 * mpg + np.random.randn(n) * 2000
         df = pd.DataFrame({"price": price, "weight": weight, "mpg": mpg})
         data = load_data(df, is_display_result=False)
-        return data.reg("price", ["weight", "mpg"])
+        return data.est.reg("price", ["weight", "mpg"])
 
     def test_right_side_equals_aligned(self, large_result):
         summary = large_result.summary()
@@ -175,7 +175,7 @@ class TestYNameInSummary:
         p = 3 + 2 * w - 1.5 * m + np.random.randn(n) * 0.3
         df = pd.DataFrame({"price": p, "weight": w, "mpg": m})
         data = load_data(df, is_display_result=False)
-        result = data.reg("price", ["weight", "mpg"])
+        result = data.est.reg("price", ["weight", "mpg"])
         summary = result.summary()
         lines = summary.split("\n")
         for line in lines:

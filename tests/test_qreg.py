@@ -215,7 +215,7 @@ def test_qreg_simple_sum_adev(auto_data):
 
 def test_tabra_data_qreg(auto_data):
     tab = TabraData(auto_data, is_display_result=False)
-    result = tab.qreg("price", ["weight", "length"], quantile=0.5)
+    result = tab.est.qreg("price", ["weight", "length"], quantile=0.5)
 
     expected_coef = np.array([1.2311394, -8.1299779, 2982.5996])
     assert np.allclose(result.coef, expected_coef, atol=0.01)

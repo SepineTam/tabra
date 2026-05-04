@@ -365,7 +365,7 @@ class TestMLogitIntegration:
     def test_tabradata_mlogit(self, mlogit_data):
         from tabra.core.data import TabraData
         tab = TabraData(mlogit_data, is_display_result=False)
-        result = tab.mlogit("y", ["x1", "x2"])
+        result = tab.est.mlogit("y", ["x1", "x2"])
         assert result is not None
         assert result.n_obs == len(mlogit_data)
         assert result.k_cat == 3
@@ -373,5 +373,5 @@ class TestMLogitIntegration:
     def test_tabradata_mlogit_base_outcome(self, mlogit_data):
         from tabra.core.data import TabraData
         tab = TabraData(mlogit_data, is_display_result=False)
-        result = tab.mlogit("y", ["x1", "x2"], base_outcome=2)
+        result = tab.est.mlogit("y", ["x1", "x2"], base_outcome=2)
         assert result.base_outcome == 2

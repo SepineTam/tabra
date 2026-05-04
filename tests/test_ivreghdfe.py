@@ -134,7 +134,7 @@ class TestIVRegHDFEAPI:
     def test_ivreghdfe_api(self, ivreghdfe_data):
         from tabra.core.data import TabraData
         tab = TabraData(ivreghdfe_data, is_display_result=False)
-        result = tab.ivreghdfe(
+        result = tab.est.ivreghdfe(
             "y", exog=["x2"], endog=["x1"], iv=["z1", "z2"],
             absorb=["id"]
         )
@@ -144,7 +144,7 @@ class TestIVRegHDFEAPI:
     def test_ivreghdfe_gmm_api(self, ivreghdfe_data):
         from tabra.core.data import TabraData
         tab = TabraData(ivreghdfe_data, is_display_result=False)
-        result = tab.ivreghdfe(
+        result = tab.est.ivreghdfe(
             "y", exog=["x2"], endog=["x1"], iv=["z1", "z2"],
             absorb=["id"], estimator="gmm"
         )

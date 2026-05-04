@@ -169,7 +169,7 @@ class TestIVProbitAPI:
     def test_ivprobit_api(self, ivprobit_data):
         from tabra.core.data import TabraData
         tab = TabraData(ivprobit_data, is_display_result=False)
-        result = tab.ivprobit("y", exog=["x2"], endog=["x1"],
+        result = tab.est.ivprobit("y", exog=["x2"], endog=["x1"],
                               iv=["z1", "z2"], method="mle")
         assert result is not None
         assert result.n_obs == 500
@@ -177,7 +177,7 @@ class TestIVProbitAPI:
     def test_ivprobit_twostep_api(self, ivprobit_data):
         from tabra.core.data import TabraData
         tab = TabraData(ivprobit_data, is_display_result=False)
-        result = tab.ivprobit("y", exog=["x2"], endog=["x1"],
+        result = tab.est.ivprobit("y", exog=["x2"], endog=["x1"],
                               iv=["z1", "z2"], method="twostep")
         assert result.method == "twostep"
 

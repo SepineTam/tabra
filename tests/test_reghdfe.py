@@ -311,7 +311,7 @@ def test_tabra_data_reghdfe(panel_data):
     from tabra.core.data import TabraData
 
     td = TabraData(panel_data, is_display_result=False)
-    result = td.reghdfe(y="y", x=["x1", "x2"], absorb=["id", "time"])
+    result = td.est.reghdfe(y="y", x=["x1", "x2"], absorb=["id", "time"])
 
     assert result.n_obs == len(panel_data)
     assert len(result.coef) == 3  # x1, x2, _cons
