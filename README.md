@@ -1,10 +1,16 @@
 # Tabra
 Tabra is a Python toolkit for empirical research workflows, designed for data processing, model estimation, result export, and reproducible analysis.
 
+[![Publish to PyPI](https://github.com/SepineTam/tabra/actions/workflows/publish.yml/badge.svg)](https://github.com/SepineTam/tabra/actions/workflows/publish.yml)
+[![PyPI version](https://img.shields.io/pypi/v/tabra.svg)](https://pypi.org/project/tabra/)
+[![PyPI Downloads](https://static.pepy.tech/badge/tabra)](https://pepy.tech/projects/tabra)
+[![Issue](https://img.shields.io/badge/Issue-report-green.svg)](https://github.com/sepinetam/tabra/issues/new)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/SepineTam/tabra)
+
 ## Quickly Start
 
 ```bash
-uv pip install git+https://github.com/sepinetam/tabra.git
+uv add 'tabra[all]'
 ```
 
 ```python
@@ -21,8 +27,14 @@ tab = load_data(pd.read_stata(
     storage_options={"User-Agent": "Mozilla/5.0"}
 ))
 
+tab.about()
+
+tab.setting.plot(block=False)
+
 tab.data.sum()
 tab.data.gen("p__sq", "price ^ 2")
+
+tab.est.reghdfe("price", ["mpg", "weight"], absorb=["rep78"])
 
 tab.plot.hist(
     "p__sq",
@@ -41,11 +53,11 @@ mix_figure = tab.plot.mix(
     template=AER
 ).show()
 
-tab.reg("price", ["mpg", "weight"])
+tab.est.reg("price", ["mpg", "weight"])
 tab.plot.coefplot().save(".local/figs/demo_coefplot", formats=["pdf"])
 
 tab.xtset("foreign")
-tab.xtreg("price", ["mpg", "weight"], model="fe")
+tab.est.xtreg("price", ["mpg", "weight"], model="fe")
 
 ```
 
