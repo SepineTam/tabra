@@ -2,13 +2,14 @@ import pytest
 import pandas as pd
 
 from tabra import load_data
+from tests.auto_data import load_auto_df
 from tabra.plot.fig_setting import PlotKind
 from tabra.plot import TabraFigure
 
 
 @pytest.fixture
 def tab():
-    df = pd.read_stata("/Applications/StataNow/auto.dta")
+    df = load_auto_df()
     return load_data(df, is_display_result=False)
 
 
