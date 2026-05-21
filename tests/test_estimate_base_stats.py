@@ -1,6 +1,7 @@
 import pytest
 
 from tabra.models.estimate.base import BaseModel
+from tabra.ops.stats import f_pval
 
 
 class _DummyModel(BaseModel):
@@ -42,3 +43,15 @@ def test_f_statistics_return_zero_when_df_invalid():
     f_stat, f_p = _DummyModel._f_statistics(10.0, 5.0, 0, 90)
     assert f_stat == 0.0
     assert f_p == 0.0
+
+
+def test_f_statistics_match_manual_formula_when_valid():
+    sse = 120.0
+    ssr = 60.0
+    df_model = 3
+    df_resid = 96
+    expected_f = (sse / df_model) / (ssr / df_resid)
+    expected_p = f_pval(expected_f, df_model, df_resid)
+    f_stat, f_p = _DummyModel._f_statistics(sse, ssr, df_model, df_resid)
+    assert f_stat == pytest.approx(expected_f)
+    assert f_p == pytest.approx(expected_p)
