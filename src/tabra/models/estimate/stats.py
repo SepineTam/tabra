@@ -49,6 +49,22 @@ class EstimationStats:
             return 1.0
         return 1 - sp_stats.chi2.cdf(chi2, df_model)
 
+    @classmethod
+    def lr_test(cls, ll_full, ll_null, df_model):
+        chi2 = max(2 * (ll_full - ll_null), 0.0)
+        p_value = cls.chi2_p_value(chi2, df_model)
+        return chi2, p_value
+
+    @staticmethod
+    def aic(ll, n_params):
+        return 2 * n_params - 2 * ll
+
+    @staticmethod
+    def bic(ll, n_params, n_obs):
+        if n_obs <= 0:
+            return np.nan
+        return np.log(n_obs) * n_params - 2 * ll
+
     @staticmethod
     def mse(ssr, df_resid):
         if df_resid <= 0:

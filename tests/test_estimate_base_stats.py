@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from tabra.models.estimate.base import BaseModel
@@ -71,3 +72,25 @@ def test_estimation_stats_mse_and_root_mse():
     assert EstimationStats.root_mse(50.0, 25) == pytest.approx(2.0 ** 0.5)
     assert EstimationStats.mse(50.0, 0) == 0.0
     assert EstimationStats.root_mse(50.0, 0) == 0.0
+
+
+def test_estimation_stats_lr_test():
+    ll_full = -120.0
+    ll_null = -130.0
+    chi2, p_value = EstimationStats.lr_test(ll_full, ll_null, 3)
+    assert chi2 == pytest.approx(20.0)
+    assert p_value == pytest.approx(EstimationStats.chi2_p_value(20.0, 3))
+
+    chi2_zero, p_value_zero = EstimationStats.lr_test(-130.0, -120.0, 3)
+    assert chi2_zero == 0.0
+    assert p_value_zero == pytest.approx(1.0)
+
+
+def test_estimation_stats_aic_and_bic():
+    ll = -100.0
+    n_params = 5
+    n_obs = 200
+    assert EstimationStats.aic(ll, n_params) == pytest.approx(210.0)
+    expected_bic = np.log(n_obs) * n_params - 2 * ll
+    assert EstimationStats.bic(ll, n_params, n_obs) == pytest.approx(expected_bic)
+    assert np.isnan(EstimationStats.bic(ll, n_params, 0))
