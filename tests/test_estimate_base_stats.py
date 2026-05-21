@@ -94,3 +94,19 @@ def test_estimation_stats_aic_and_bic():
     expected_bic = np.log(n_obs) * n_params - 2 * ll
     assert EstimationStats.bic(ll, n_params, n_obs) == pytest.approx(expected_bic)
     assert np.isnan(EstimationStats.bic(ll, n_params, 0))
+
+
+def test_adjusted_r_squared_returns_zero_when_df_resid_non_positive():
+    assert EstimationStats.adjusted_r_squared(0.8, n_obs=3, k_vars=3, is_con=True) == 0.0
+    assert EstimationStats.adjusted_r_squared(0.8, n_obs=2, k_vars=3, is_con=False) == 0.0
+
+
+def test_f_statistics_handles_non_positive_ssr():
+    f_stat, f_p = EstimationStats.f_statistics(sse=10.0, ssr=0.0, df_model=2, df_resid=20)
+    assert f_stat == 0.0
+    assert f_p == 0.0
+
+
+def test_chi2_p_value_returns_one_when_df_non_positive():
+    assert EstimationStats.chi2_p_value(10.0, 0) == 1.0
+    assert EstimationStats.chi2_p_value(10.0, -1) == 1.0
