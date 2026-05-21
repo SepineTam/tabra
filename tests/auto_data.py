@@ -9,7 +9,10 @@ from urllib.request import urlopen
 import pandas as pd
 import pytest
 
-_AUTO_URL = "https://www.stata-press.com/data/r19/auto2.dta"
+_AUTO_URLS = (
+    "https://www.stata-press.com/data/r19/auto2.dta",
+    "https://www.stata-press.com/data/r18/auto2.dta",
+)
 _CACHE_PATH = Path(".local/data/auto.dta")
 
 
@@ -24,11 +27,22 @@ def load_auto_df(*, convert_categoricals=True):
         return pd.read_stata(_CACHE_PATH, convert_categoricals=convert_categoricals)
 
     _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        with urlopen(_AUTO_URL, timeout=20) as response:
-            payload = response.read()
-    except Exception as exc:
-        pytest.skip(f"Auto dataset unavailable in this environment: {exc}")
+    last_error = None
+    payload = None
+    for url in _AUTO_URLS:
+        try:
+            with urlopen(url, timeout=20) as response:
+                payload = response.read()
+            if payload:
+                break
+        except Exception as exc:
+            last_error = exc
+
+    if not payload:
+        pytest.skip(
+            "Unable to download Stata auto dataset from configured URLs. "
+            f"Last error: {last_error}"
+        )
     data = BytesIO(payload)
     df = pd.read_stata(data, convert_categoricals=convert_categoricals)
     _CACHE_PATH.write_bytes(payload)
