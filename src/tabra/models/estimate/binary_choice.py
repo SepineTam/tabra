@@ -100,13 +100,13 @@ class BinaryChoiceModel(BaseModel):
 
         # Pseudo R-squared and chi2
         if is_con:
-            pseudo_r2 = 1 - ll / ll_0 if ll_0 != 0 else 0.0
+            pseudo_r2 = self._pseudo_r_squared(ll, ll_0)
             chi2 = 2 * (ll - ll_0)
         else:
             pseudo_r2 = np.nan
             chi2 = float(beta @ np.linalg.inv(V) @ beta)
 
-        df_m = k - 1 if is_con else k
+        df_m = self._model_df(k, is_con=is_con)
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
 
         y_pred = (p >= 0.5).astype(int)

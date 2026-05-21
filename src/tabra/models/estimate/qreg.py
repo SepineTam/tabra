@@ -63,8 +63,8 @@ class QuantileRegression(BaseModel):
         pseudo_r2 = 1.0 - sum_adev / sum_rdev if sum_rdev > 0 else 0.0
 
         # Degrees of freedom
-        df_model = k - 1 if is_con else k
-        df_resid = n - k
+        df_model = self._model_df(k, is_con=is_con)
+        df_resid = self._resid_df(n, k)
 
         # VCE: iid standard errors using kernel density estimation
         vce, f_r, sparsity, bwidth = self._compute_vce_iid(

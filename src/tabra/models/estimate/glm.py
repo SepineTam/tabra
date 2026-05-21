@@ -145,13 +145,10 @@ class GLMModel(BaseModel):
         ll_0 = self._fit_null_model(y_vec, family, link, n)
 
         # Pseudo R2: McFadden for binomial/poisson, deviance-based for others
-        if ll_0 != 0:
-            pseudo_r2 = max(1 - ll / ll_0, 0.0)
-        else:
-            pseudo_r2 = 0.0
+        pseudo_r2 = max(self._pseudo_r_squared(ll, ll_0), 0.0)
 
         # LR chi2
-        df_m = k - 1 if is_con else k
+        df_m = self._model_df(k, is_con=is_con)
         chi2 = 2 * (ll - ll_0)
         chi2 = max(chi2, 0.0)
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
