@@ -1,6 +1,7 @@
 import pytest
 
 from tabra.models.estimate.base import BaseModel
+from tabra.models.estimate.stats import EstimationStats
 from tabra.ops.stats import f_pval
 
 
@@ -55,3 +56,18 @@ def test_f_statistics_match_manual_formula_when_valid():
     f_stat, f_p = _DummyModel._f_statistics(sse, ssr, df_model, df_resid)
     assert f_stat == pytest.approx(expected_f)
     assert f_p == pytest.approx(expected_p)
+
+
+def test_estimation_stats_chi2_p_value_and_r_squared():
+    chi2 = 5.991464547107979
+    assert EstimationStats.chi2_p_value(chi2, 2) == pytest.approx(0.05, abs=1e-6)
+    assert EstimationStats.chi2_p_value(chi2, 0) == 1.0
+    assert EstimationStats.r_squared(20.0, 100.0) == pytest.approx(0.8)
+    assert EstimationStats.r_squared(20.0, 0.0) == 0.0
+
+
+def test_estimation_stats_mse_and_root_mse():
+    assert EstimationStats.mse(50.0, 25) == pytest.approx(2.0)
+    assert EstimationStats.root_mse(50.0, 25) == pytest.approx(2.0 ** 0.5)
+    assert EstimationStats.mse(50.0, 0) == 0.0
+    assert EstimationStats.root_mse(50.0, 0) == 0.0
