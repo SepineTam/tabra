@@ -110,12 +110,12 @@ class TobitModel(BaseModel):
         p_value = 2 * (1 - sp_stats.t.cdf(np.abs(t_stat), df=n - k))
 
         # LR test
-        df_m = k - 1 if is_con else k
+        df_m = self._model_df(k, is_con=is_con)
         chi2 = 2 * (ll_val - ll_0)
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
 
         # Pseudo R-squared
-        pseudo_r2 = 1 - ll_val / ll_0 if ll_0 != 0 else 0.0
+        pseudo_r2 = self._pseudo_r_squared(ll_val, ll_0)
 
         return TobitResult(
             coef=beta,

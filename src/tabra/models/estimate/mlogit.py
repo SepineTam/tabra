@@ -140,7 +140,7 @@ class MultinomialLogitModel(BaseModel):
             p_value[cat] = p_flat[eq_i * k:(eq_i + 1) * k]
 
         # Pseudo R2
-        pseudo_r2 = 1 - ll / ll_0 if ll_0 != 0 else 0.0
+        pseudo_r2 = self._pseudo_r_squared(ll, ll_0)
 
         # LR chi2
         df_m = n_eq * k - (1 if is_con else 0) * n_eq

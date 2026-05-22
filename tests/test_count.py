@@ -4,11 +4,12 @@ import numpy as np
 import pytest
 
 from tabra import load_data
+from tests.auto_data import load_auto_df
 
 
 @pytest.fixture
 def tab():
-    df = pd.read_stata(".local/data/auto.dta", convert_categoricals=False)
+    df = load_auto_df(convert_categoricals=False)
     return load_data(df, is_display_result=False)
 
 

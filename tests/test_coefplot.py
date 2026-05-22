@@ -303,8 +303,16 @@ class TestCoefplotIntegration:
     @pytest.fixture
     def dta(self):
         import pandas as pd
+        import numpy as np
         from tabra import load_data
-        df = pd.read_stata("/Applications/StataNow/auto.dta")
+        rng = np.random.default_rng(42)
+        n = 120
+        df = pd.DataFrame({
+            "price": 5000 + 120 * rng.normal(25, 6, n) + 1.8 * rng.normal(3000, 450, n) + rng.normal(0, 800, n),
+            "mpg": rng.normal(25, 6, n),
+            "weight": rng.normal(3000, 450, n),
+            "length": rng.normal(185, 12, n),
+        })
         return load_data(df, is_display_result=False)
 
     def test_via_plotops(self, dta):

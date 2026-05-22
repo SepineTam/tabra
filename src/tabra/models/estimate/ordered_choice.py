@@ -101,10 +101,10 @@ class OrderedChoiceModel(BaseModel):
         p_value = 2 * (1 - sp_stats.norm.cdf(np.abs(z_stat)))
 
         # Pseudo R2
-        pseudo_r2 = 1 - ll / ll_0 if ll_0 != 0 else 0.0
+        pseudo_r2 = self._pseudo_r_squared(ll, ll_0)
 
         # LR chi2
-        df_m = k - 1 if is_con else k
+        df_m = self._model_df(k, is_con=is_con)
         chi2 = 2 * (ll - ll_0)
         chi2 = max(chi2, 0)
         chi2_pval = 1 - sp_stats.chi2.cdf(chi2, df_m) if df_m > 0 else 1.0
