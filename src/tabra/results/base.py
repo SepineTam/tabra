@@ -64,7 +64,7 @@ class BaseResult(ABC):
         divider = "-" * 28
         command_line = f". {self.display_command()}"
         body = self.formatted_summary()
-        return f"{divider}\n{command_line}\n{body}\n"
+        return f"{divider}\n{command_line}\n\n{body}\n"
 
     @abstractmethod
     def save(self, path): ...
