@@ -19,13 +19,31 @@ class BaseResult(ABC):
 
     def set_display(self, is_display: bool = True):
         if is_display:
-            print(self.summary())
+            print(self.formatted_summary())
 
     @abstractmethod
     def summary(self): ...
 
     def __repr__(self):
-        return self.summary()
+        return self.formatted_summary()
+
+    def formatted_summary(self) -> str:
+        """Return a display-safe summary string.
+
+        This normalizes escaped control sequences that may appear in upstream
+        string payloads and makes tab spacing predictable across terminals.
+        """
+        text = self.summary()
+        if not isinstance(text, str):
+            text = str(text)
+
+        # Normalize escaped sequences when they are embedded as plain text.
+        text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+        # Replace tabs with spaces to reduce terminal-specific alignment drift.
+        lines = [line.expandtabs(4).rstrip() for line in text.split("\n")]
+        return "\n".join(lines).rstrip("\n")
 
     @abstractmethod
     def save(self, path): ...
