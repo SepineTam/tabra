@@ -55,8 +55,7 @@ class EstAccessor:
         command = f"reg {y} {' '.join(x)}"
         if not is_con:
             command += ", nocons"
-        if hasattr(result, "set_command"):
-            result.set_command(command)
+        result.set_command(command)
         self._tabra._result = result
         if self._tabra._is_display_result:
             result.set_display(True)
@@ -95,8 +94,7 @@ class EstAccessor:
             command += f" cluster({' '.join(cluster)})"
         if not is_con:
             command += " nocons"
-        if hasattr(result, "set_command"):
-            result.set_command(command)
+        result.set_command(command)
         self._tabra._result = result
         if self._tabra._is_display_result:
             result.set_display(True)
@@ -127,8 +125,7 @@ class EstAccessor:
         command = f"xtreg {y} {' '.join(x)}, {model}"
         if not is_con:
             command += " nocons"
-        if hasattr(result, "set_command"):
-            result.set_command(command)
+        result.set_command(command)
         self._tabra._result = result
         if self._tabra._is_display_result:
             result.set_display(True)

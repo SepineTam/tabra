@@ -8,6 +8,7 @@ class DummyResult:
     def __init__(self):
         self.style = None
         self.display_called = False
+        self.command = None
 
     def set_style(self, style):
         self.style = style
@@ -15,6 +16,9 @@ class DummyResult:
     def set_display(self, flag):
         if flag:
             self.display_called = True
+
+    def set_command(self, command):
+        self.command = command
 
 
 class DummyModel:
@@ -55,6 +59,7 @@ def test_reg_assigns_style_updates_tabra_result_and_display(monkeypatch):
     assert recorder["kwargs"]["is_con"] is False
     assert result.style == "stata"
     assert result.display_called is True
+    assert result.command == "reg y x, nocons"
     assert tabra._result is result
 
 
@@ -72,6 +77,7 @@ def test_reg_no_display_when_disabled(monkeypatch):
     result = accessor.reg("y", ["x"])
 
     assert result.display_called is False
+    assert result.command == "reg y x"
 
 
 def test_xtreg_requires_xtset_before_fit():
@@ -103,3 +109,4 @@ def test_xtreg_passes_panel_var_and_model_options(monkeypatch):
     assert recorder["kwargs"]["model"] == "re"
     assert recorder["kwargs"]["is_con"] is False
     assert result.style == "stata"
+    assert result.command == "xtreg y x, re nocons"
