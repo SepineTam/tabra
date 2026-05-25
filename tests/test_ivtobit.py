@@ -10,6 +10,7 @@
 """Tests for ivtobit: MLE and twostep estimators."""
 
 import numpy as np
+from pathlib import Path
 import pandas as pd
 import pytest
 
@@ -216,9 +217,10 @@ class TestIVTobitStataCrossValidation:
     @pytest.fixture(scope="class")
     def stata_data(self):
         """Load the Stata-generated verification data."""
-        return pd.read_stata(
-            "/Users/sepinetam/Documents/Github/tabra/tmp/ivtobit_verify_data.dta"
-        )
+        data_path = Path(__file__).parent / "data" / "ivtobit_verify_data.dta"
+        if not data_path.exists():
+            pytest.skip(f"Missing Stata verification data file: {data_path}")
+        return pd.read_stata(data_path)
 
     def test_mle_ll0_coef(self, stata_data):
         """MLE left-censored coefficients match Stata."""

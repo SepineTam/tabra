@@ -20,7 +20,7 @@ def sum_data():
         "price": np.random.randn(n) * 1000 + 5000,
         "mpg": np.random.randn(n) * 5 + 20,
         "weight": np.random.randn(n) * 500 + 3000,
-        "cat_col": ["a", "b"] * 50,  # non-numeric, should be excluded
+        "cat_col": ["a", "b"] * 50,  # Non-numeric column should be excluded
     })
     return df
 
@@ -28,21 +28,21 @@ def sum_data():
 # ============ Basic mode ============
 
 def test_summarize_returns_result_object(sum_data):
-    """summarize 应返回 SummarizeResult 对象"""
+    """sum should return a SummarizeResult-like object."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize()
+    result = tab.data.sum()
     assert result is not None
     assert hasattr(result, "summary")
 
 
 def test_summarize_default_all_numeric(sum_data):
-    """var_list=None 应只包含数值列"""
+    """When var_list is None, only numeric columns should be included."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize()
+    result = tab.data.sum()
     assert "price" in result.var_names
     assert "mpg" in result.var_names
     assert "weight" in result.var_names
@@ -50,60 +50,60 @@ def test_summarize_default_all_numeric(sum_data):
 
 
 def test_summarize_specified_vars(sum_data):
-    """指定 var_list 应只包含指定列"""
+    """When var_list is specified, only those variables should be included."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price", "mpg"])
+    result = tab.data.sum(var_list=["price", "mpg"])
     assert result.var_names == ["price", "mpg"]
 
 
 def test_summarize_obs_count(sum_data):
-    """Obs 应等于行数"""
+    """Obs should equal the number of rows."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"])
+    result = tab.data.sum(var_list=["price"])
     assert result.obs["price"] == 100
 
 
 def test_summarize_mean_matches_numpy(sum_data):
-    """Mean 应与 numpy 一致"""
+    """Mean should match NumPy results."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price", "mpg"])
+    result = tab.data.sum(var_list=["price", "mpg"])
     assert np.isclose(result.mean["price"], sum_data["price"].mean(), atol=1e-10)
     assert np.isclose(result.mean["mpg"], sum_data["mpg"].mean(), atol=1e-10)
 
 
 def test_summarize_std_matches_numpy(sum_data):
-    """Std.Dev 应与 numpy ddof=1 一致"""
+    """Std. dev should match NumPy with ddof=1."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"])
+    result = tab.data.sum(var_list=["price"])
     assert np.isclose(result.std["price"], sum_data["price"].std(ddof=1), atol=1e-10)
 
 
 def test_summarize_min_max(sum_data):
-    """Min/Max 应与实际一致"""
+    """Min and max should match actual data values."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"])
+    result = tab.data.sum(var_list=["price"])
     assert np.isclose(result.min_val["price"], sum_data["price"].min(), atol=1e-10)
     assert np.isclose(result.max_val["price"], sum_data["price"].max(), atol=1e-10)
 
 
 def test_summarize_missing_values():
-    """含缺失值的列，Obs 应排除 NaN"""
+    """For columns with missing values, Obs should exclude NaN."""
     from tabra import load_data
 
     np.random.seed(42)
     df = pd.DataFrame({"x": [1, 2, np.nan, 4, 5, np.nan, 7, 8, 9, 10]})
     tab = load_data(df, is_display_result=False)
-    result = tab.summarize()
+    result = tab.data.sum()
     assert result.obs["x"] == 8
     assert np.isclose(result.mean["x"], np.nanmean(df["x"]), atol=1e-10)
 
@@ -111,22 +111,22 @@ def test_summarize_missing_values():
 # ============ Detail mode ============
 
 def test_summarize_detail_has_percentiles(sum_data):
-    """detail=True 应包含 percentiles"""
+    """detail=True should include percentiles."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"], detail=True)
+    result = tab.data.sum(var_list=["price"], detail=True)
     assert "1%" in result.percentiles["price"]
     assert "50%" in result.percentiles["price"]
     assert "99%" in result.percentiles["price"]
 
 
 def test_summarize_detail_median(sum_data):
-    """detail 50% 应与 numpy median 一致"""
+    """The detail 50% percentile should match NumPy median."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"], detail=True)
+    result = tab.data.sum(var_list=["price"], detail=True)
     assert np.isclose(
         result.percentiles["price"]["50%"],
         np.median(sum_data["price"]),
@@ -135,12 +135,12 @@ def test_summarize_detail_median(sum_data):
 
 
 def test_summarize_detail_skewness(sum_data):
-    """detail skewness 应与 scipy 一致"""
+    """Detail skewness should match SciPy."""
     from tabra import load_data
     from scipy.stats import skew
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"], detail=True)
+    result = tab.data.sum(var_list=["price"], detail=True)
     assert np.isclose(
         result.skewness["price"],
         skew(sum_data["price"], bias=False),
@@ -149,12 +149,12 @@ def test_summarize_detail_skewness(sum_data):
 
 
 def test_summarize_detail_kurtosis(sum_data):
-    """detail kurtosis 应与 scipy 一致"""
+    """Detail kurtosis should match SciPy."""
     from tabra import load_data
     from scipy.stats import kurtosis
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price"], detail=True)
+    result = tab.data.sum(var_list=["price"], detail=True)
     assert np.isclose(
         result.kurtosis["price"],
         kurtosis(sum_data["price"], bias=False),
@@ -165,11 +165,11 @@ def test_summarize_detail_kurtosis(sum_data):
 # ============ Summary display ============
 
 def test_summarize_summary_contains_headers(sum_data):
-    """summary 应包含 Obs/Mean/Std.Dev/Min/Max 表头"""
+    """Summary output should contain core statistic headers."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price", "mpg"])
+    result = tab.data.sum(var_list=["price", "mpg"])
     s = result.summary()
     assert "Obs" in s
     assert "Mean" in s
@@ -179,11 +179,11 @@ def test_summarize_summary_contains_headers(sum_data):
 
 
 def test_summarize_summary_contains_var_names(sum_data):
-    """summary 应包含变量名"""
+    """Summary output should contain variable names."""
     from tabra import load_data
 
     tab = load_data(sum_data, is_display_result=False)
-    result = tab.summarize(var_list=["price", "mpg"])
+    result = tab.data.sum(var_list=["price", "mpg"])
     s = result.summary()
     assert "price" in s
     assert "mpg" in s
