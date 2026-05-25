@@ -13,9 +13,14 @@ from abc import ABC, abstractmethod
 class BaseResult(ABC):
     def __init__(self):
         self._style = "stata"
+        self._display_command = ""
 
     def set_style(self, style: str):
         self._style = style
+
+    def set_command(self, command: str):
+        """Set the command line label used by interactive display."""
+        self._display_command = command
 
     def set_display(self, is_display: bool = True):
         if is_display:
@@ -28,7 +33,9 @@ class BaseResult(ABC):
         return self.formatted_summary()
 
     def display_command(self) -> str:
-        """Return a Stata-like command label for display blocks."""
+        """Return the display command label."""
+        if self._display_command:
+            return self._display_command
         class_name = self.__class__.__name__
         if class_name.endswith("Result"):
             class_name = class_name[:-6]
@@ -53,11 +60,11 @@ class BaseResult(ABC):
         return "\n".join(lines).rstrip("\n")
 
     def render_display_block(self) -> str:
-        """Render a separated display block with command and output body."""
-        divider = "-" * 80
+        """Render a concise Stata-like display block."""
+        divider = "-" * 28
         command_line = f". {self.display_command()}"
         body = self.formatted_summary()
-        return f"{divider}\n{command_line}\n{divider}\n{body}\n"
+        return f"{divider}\n{command_line}\n{body}\n"
 
     @abstractmethod
     def save(self, path): ...

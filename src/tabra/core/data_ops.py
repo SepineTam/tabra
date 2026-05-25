@@ -1135,6 +1135,11 @@ class DataOps:
             detail=detail,
         )
         result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
+        summarize_vars = " ".join(cols)
+        command = f"summarize {summarize_vars}".strip()
+        if detail:
+            command += ", detail"
+        result.set_command(command)
         self._tabra._result = result
 
         if getattr(self._tabra, '_is_display_result', True):

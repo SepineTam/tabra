@@ -52,6 +52,10 @@ class EstAccessor:
         model = OLS()
         result = model.fit(self._tabra._df, y, x, is_con=is_con)
         result.set_style(self._tabra._style)
+        command = f"reg {y} {' '.join(x)}"
+        if not is_con:
+            command += ", nocons"
+        result.set_command(command)
         self._tabra._result = result
         if self._tabra._is_display_result:
             result.set_display(True)
@@ -83,6 +87,14 @@ class EstAccessor:
         result = model.fit(self._tabra._df, y, x, absorb=absorb,
                            vce=vce, cluster=cluster, is_con=is_con)
         result.set_style(self._tabra._style)
+        command = f"reghdfe {y} {' '.join(x)}, absorb({' '.join(absorb)})"
+        if vce != "unadjusted":
+            command += f" vce({vce})"
+        if cluster:
+            command += f" cluster({' '.join(cluster)})"
+        if not is_con:
+            command += " nocons"
+        result.set_command(command)
         self._tabra._result = result
         if self._tabra._is_display_result:
             result.set_display(True)
@@ -110,6 +122,10 @@ class EstAccessor:
         panel_model = PanelModel()
         result = panel_model.fit(self._tabra._df, y, x, self._tabra._panel_var, model=model, is_con=is_con)
         result.set_style(self._tabra._style)
+        command = f"xtreg {y} {' '.join(x)}, {model}"
+        if not is_con:
+            command += " nocons"
+        result.set_command(command)
         self._tabra._result = result
         if self._tabra._is_display_result:
             result.set_display(True)
