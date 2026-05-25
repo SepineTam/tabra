@@ -19,13 +19,20 @@ class BaseResult(ABC):
 
     def set_display(self, is_display: bool = True):
         if is_display:
-            print(self.formatted_summary())
+            print(self.render_display_block())
 
     @abstractmethod
     def summary(self): ...
 
     def __repr__(self):
         return self.formatted_summary()
+
+    def display_command(self) -> str:
+        """Return a Stata-like command label for display blocks."""
+        class_name = self.__class__.__name__
+        if class_name.endswith("Result"):
+            class_name = class_name[:-6]
+        return class_name.lower()
 
     def formatted_summary(self) -> str:
         """Return a display-safe summary string.
@@ -44,6 +51,13 @@ class BaseResult(ABC):
         # Replace tabs with spaces to reduce terminal-specific alignment drift.
         lines = [line.expandtabs(4).rstrip() for line in text.split("\n")]
         return "\n".join(lines).rstrip("\n")
+
+    def render_display_block(self) -> str:
+        """Render a separated display block with command and output body."""
+        divider = "-" * 80
+        command_line = f". {self.display_command()}"
+        body = self.formatted_summary()
+        return f"{divider}\n{command_line}\n{divider}\n{body}\n"
 
     @abstractmethod
     def save(self, path): ...
