@@ -152,29 +152,30 @@ class RegHDFEResult(BaseResult):
         from scipy import stats
 
         lines = []
-        LW = 76
+        LW = 78
+        RLW = 30
 
-        def right(label, value, fmt="8.4f"):
-            return f"{label:<{LW - 18}s}{value:>{fmt}}"
+        def compose(left_text: str, right_label: str, right_value: str) -> str:
+            right_block = f"{right_label:<18s} = {right_value:>8s}"
+            return f"{left_text:<{LW - RLW}s}{right_block}"
 
-        def right_str(label, value):
-            return f"{label:<{LW - 18}s}{value:>18s}"
+        def right_stat(label: str, value, fmt: str = "8.4f") -> str:
+            return compose("", label, f"{value:{fmt}}")
 
         # Header
+        lines.append(compose("HDFE Linear regression", "Number of obs", f"{self._n_obs:8d}"))
         lines.append(
-            f"{'HDFE Linear regression':<{LW - 18}s}Number of obs   ={self._n_obs:>11d}"
+            compose(
+                "Absorbing " + str(self._n_hdfe) + " HDFE group" + ("s" if self._n_hdfe > 1 else ""),
+                f"F({self._df_model:>3d}, {self._df_resid:>5d})",
+                f"{self._f_stat:8.2f}",
+            )
         )
-        lines.append(
-            f"{'Absorbing ' + str(self._n_hdfe) + ' HDFE group' + ('s' if self._n_hdfe > 1 else ''):<{LW - 18}s}"
-            + f"F({self._df_model:>3d}, {self._df_resid:>5d})={self._f_stat:>11.2f}"
-        )
-        lines.append(
-            f"{'':<{LW - 18}s}Prob > F        ={self._f_pval:>11.4f}"
-        )
-        lines.append(right("R-squared", self._r_squared))
-        lines.append(right("Adj R-squared", self._r_squared_adj))
-        lines.append(right("Within R-sq.", self._r2_within))
-        lines.append(right("Root MSE", self._root_mse))
+        lines.append(right_stat("Prob > F", self._f_pval))
+        lines.append(right_stat("R-squared", self._r_squared))
+        lines.append(right_stat("Adj R-squared", self._r_squared_adj))
+        lines.append(right_stat("Within R-sq.", self._r2_within))
+        lines.append(right_stat("Root MSE", self._root_mse))
         lines.append("")
 
         # Coefficient table

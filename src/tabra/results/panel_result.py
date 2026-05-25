@@ -163,33 +163,32 @@ class PanelResult(BaseResult):
         }
         title = model_titles.get(self._model_type, "Panel regression")
 
-        LW = 76
-        RLW = 18
+        LW = 78
+        RLW = 30
 
-        def right(label, value, fmt="8.4f"):
-            return f"{label:<{LW - RLW}s}{value:>{fmt}}"
+        def compose(left_text: str, right_label: str, right_value: str) -> str:
+            if not right_label and not right_value:
+                return left_text
+            right_block = f"{right_label:<18s} = {right_value:>8s}"
+            return f"{left_text:<{LW - RLW}s}{right_block}"
 
-        def right_str(label, value):
-            return f"{label:<{LW - RLW}s}{value:>{RLW}s}"
+        def right_stat(label: str, value, fmt: str = "8.4f") -> str:
+            return compose("", label, f"{value:{fmt}}")
 
         # Header
-        lines.append(f"{title:<{LW - RLW}s}Number of obs     ={self._n_obs:>10d}")
+        lines.append(compose(title, "Number of obs", f"{self._n_obs:8d}"))
         if self._n_groups is not None:
-            lines.append(
-                right_str("Group variable", "")
-            )
-            lines.append(
-                f"{'':<{LW - RLW}s}Number of groups  ={self._n_groups:>10d}"
-            )
-        lines.append(right("R-squared", self._r_squared))
+            lines.append(compose("Group variable", "", ""))
+            lines.append(compose("", "Number of groups", f"{self._n_groups:8d}"))
+        lines.append(right_stat("R-squared", self._r_squared))
         if self._model_type in ("fe", "re"):
-            lines.append(right("Adj R-squared", self._r_squared_adj))
+            lines.append(right_stat("Adj R-squared", self._r_squared_adj))
 
         # F or chi2 test
         if self._model_type in ("fe", "be"):
             f_label = f"F({self._df_model}, {self._df_resid})"
-            lines.append(right(f_label, self._f_stat, "8.2f"))
-            lines.append(right("Prob > F", self._f_pval))
+            lines.append(right_stat(f_label, self._f_stat, "8.2f"))
+            lines.append(right_stat("Prob > F", self._f_pval))
         elif self._model_type in ("re", "mle", "pa"):
             from scipy.stats import chi2
             if self._chi2_stat is not None:
@@ -201,8 +200,8 @@ class PanelResult(BaseResult):
                     np.diag(self._std_err ** 2)) @ self._coef) if len(self._coef) > 0 else 0.0
                 chi2_pval = 1 - chi2.cdf(chi2_val, self._df_model)
                 chi2_label = f"chi2({self._df_model})"
-            lines.append(right(chi2_label, chi2_val, "8.2f"))
-            lines.append(right("Prob > chi2", chi2_pval))
+            lines.append(right_stat(chi2_label, chi2_val, "8.2f"))
+            lines.append(right_stat("Prob > chi2", chi2_pval))
 
         lines.append("")
 
