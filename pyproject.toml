@@ -25,6 +25,7 @@ tabra = "tabra:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "--cov=src/tabra/api --cov=src/tabra/core --cov=src/tabra/models --cov=src/tabra/ops --cov=src/tabra/results --cov=src/tabra/utils --cov-report=term-missing --cov-fail-under=80"
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
@@ -33,4 +34,5 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-cov>=6.2.1",
 ]
