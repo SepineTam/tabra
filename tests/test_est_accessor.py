@@ -9,6 +9,7 @@ class DummyResult:
         self.style = None
         self.command = None
         self.display_called = False
+        self.command = None
 
     def set_style(self, style):
         self.style = style
@@ -60,6 +61,7 @@ def test_reg_assigns_style_updates_tabra_result_and_display(monkeypatch):
     assert result.style == "stata"
     assert result.command == "reg y x, nocons"
     assert result.display_called is True
+    assert result.command == "reg y x, nocons"
     assert tabra._result is result
 
 
