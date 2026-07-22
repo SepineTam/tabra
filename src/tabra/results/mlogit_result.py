@@ -10,13 +10,16 @@
 import numpy as np
 from scipy import stats as sp_stats
 
+from tabra.results.base import BaseResult
 
-class MLogitResult:
+
+class MLogitResult(BaseResult):
     def __init__(self, coef, std_err, z_stat, p_value,
                  ll, ll_0, pseudo_r2, chi2, chi2_pval,
                  n_obs, k_vars, k_cat, df_m,
                  var_names, y_name, categories, base_outcome,
                  converged, model_name, V):
+        super().__init__()
         # coef: dict {category: array_of_coefs}
         self._coef = coef
         self._std_err = std_err
@@ -38,9 +41,6 @@ class MLogitResult:
         self._converged = bool(converged)
         self._model_name = model_name
         self._V = V
-
-        self._style = "stata"
-        self._display = False
 
     @property
     def coef(self):
@@ -122,14 +122,6 @@ class MLogitResult:
     def V(self):
         return self._V
 
-    def set_style(self, style: str):
-        self._style = style
-
-    def set_display(self, is_display: bool = True):
-        self._display = is_display
-        if is_display:
-            print(self.summary())
-
     def summary(self):
         dispatch = {
             "stata": self._summary_style_stata,
@@ -191,8 +183,5 @@ class MLogitResult:
         return "\n".join(lines)
 
     def save(self, path="mlogit_result.txt"):
-        with open(path, "w") as f:
-            f.write(self.summary())
-
-    def __repr__(self):
-        return self.summary()
+        with open(path, "w") as file:
+            file.write(self.formatted_summary())

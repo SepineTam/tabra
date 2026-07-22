@@ -13,36 +13,20 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from tabra.data.expressions import ExpressionEngine
+from tabra.data.variables import VariableCommands
+
 
 class DataOps:
     """Data manipulation operations for TabraData."""
 
     def __init__(self, tabra):
         self._tabra = tabra
-
-    @staticmethod
-    def _preprocess_expr(expr: str) -> str:
-        """Convert Stata-style expressions to pandas-compatible ones."""
-        # ^ → ** (exponentiation)
-        expr = re.sub(r'\^', '**', expr)
-        return expr
-
-    @staticmethod
-    def _log(x, base=None):
-        """Log function supporting optional base (Stata-style)."""
-        if base is None:
-            return np.log(x)
-        return np.log(x) / np.log(base)
+        self.variables = VariableCommands(tabra, owner=self)
 
     def _eval(self, expr: str):
-        """Evaluate expression with DataFrame columns + numpy math functions."""
-        expr = self._preprocess_expr(expr)
-        ns = {col: self._tabra._df[col] for col in self._tabra._df.columns}
-        ns.update({
-            "exp": np.exp, "log": self._log, "log10": np.log10,
-            "sqrt": np.sqrt, "abs": np.abs,
-        })
-        return eval(expr, {"__builtins__": {}}, ns)
+        """Evaluate a restricted expression against the current data."""
+        return ExpressionEngine.evaluate(expr, self._tabra._df)
 
     def gen(self, var: str, expr: str, replace: bool = False):
         """Generate a new variable based on an expression.
@@ -59,18 +43,7 @@ class DataOps:
             >>> dta = load_data("auto")
             >>> dta.data.gen("mpg_sq", "mpg^2")
         """
-        if var in self._tabra._df.columns:
-            if not replace:
-                raise ValueError(
-                    f"Variable '{var}' already exists. "
-                    f"Use replace=True to overwrite, "
-                    f"or use tab.data.replace() / tab.data.drop() first."
-                )
-
-        df = self._tabra._df.copy()
-        df[var] = self._eval(expr)
-        self._tabra._df = df
-        return self
+        return self.variables.gen(var, expr, replace=replace)
 
     def replace(self, var: str, expr: str, cond: str = None):
         """
@@ -90,24 +63,7 @@ class DataOps:
         self : DataOps
             Returns self for method chaining
         """
-        if var not in self._tabra._df.columns:
-            raise KeyError(f"Variable '{var}' not found in DataFrame")
-
-        if cond is None:
-            self._tabra._df[var] = self._eval(expr)
-        else:
-            mask = self._tabra._df.eval(cond)
-            ns = {col: self._tabra._df.loc[mask, col] for col in self._tabra._df.columns}
-            ns.update({
-                "exp": np.exp, "log": self._log, "log10": np.log10,
-                "sqrt": np.sqrt, "abs": np.abs,
-            })
-            self._tabra._df.loc[mask, var] = eval(
-                self._preprocess_expr(expr),
-                {"__builtins__": {}}, ns,
-            )
-
-        return self
+        return self.variables.replace(var, expr, cond=cond)
 
     def _parse_vars(self, vars_input):
         """Parse vars input into a list of variable names."""
@@ -1019,13 +975,11 @@ class DataOps:
             method=method,
             n_obs=n_obs,
         )
-        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
-        self._tabra._result = result
-
-        if getattr(self._tabra, '_is_display_result', True):
-            print(result.summary())
-
-        return result
+        options = [] if method == "pearson" else [method]
+        command = f"correlate {' '.join(cols)}"
+        if options:
+            command += ", " + " ".join(options)
+        return self._tabra._finalize_result(result, command=command)
 
     def cov(
         self,
@@ -1068,13 +1022,8 @@ class DataOps:
             var_names=cols,
             n_obs=n_obs,
         )
-        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
-        self._tabra._result = result
-
-        if getattr(self._tabra, '_is_display_result', True):
-            print(result.summary())
-
-        return result
+        command = f"correlate {' '.join(cols)}, covariance"
+        return self._tabra._finalize_result(result, command=command)
 
     def sum(
         self,
@@ -1134,18 +1083,11 @@ class DataOps:
             kurtosis=kurtosis if detail else None,
             detail=detail,
         )
-        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
         summarize_vars = " ".join(cols)
         command = f"summarize {summarize_vars}".strip()
         if detail:
             command += ", detail"
-        result.set_command(command)
-        self._tabra._result = result
-
-        if getattr(self._tabra, '_is_display_result', True):
-            result.set_display(True)
-
-        return result
+        return self._tabra._finalize_result(result, command=command)
 
     def describe(self, vars: list[str] | str = None):
         """Print variable overview (Stata describe).
@@ -1292,13 +1234,8 @@ class DataOps:
                 col_totals=col_totals,
                 grand_total=grand_total,
             )
-            result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
-            self._tabra._result = result
-
-            if getattr(self._tabra, '_is_display_result', True):
-                print(result.summary())
-
-            return result
+            command = f"tabulate {var} {by}"
+            return self._tabra._finalize_result(result, command=command)
 
     def xttrans(
         self,
@@ -1391,10 +1328,5 @@ class DataOps:
             n_obs=len(df_sorted),
             n_transitions=n_transitions,
         )
-        result.set_style(self._tabra._style if hasattr(self._tabra, '_style') else "stata")
-        self._tabra._result = result
-
-        if getattr(self._tabra, '_is_display_result', True):
-            print(result.summary())
-
-        return result
+        command = f"xttrans {var}"
+        return self._tabra._finalize_result(result, command=command)

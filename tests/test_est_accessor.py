@@ -8,9 +8,13 @@ class DummyResult:
     def __init__(self):
         self.style = None
         self.display_called = False
+        self.command = None
 
     def set_style(self, style):
         self.style = style
+
+    def set_command(self, command):
+        self.command = command
 
     def set_display(self, flag):
         if flag:
@@ -33,7 +37,20 @@ class DummyTabra:
         self._style = "stata"
         self._is_display_result = is_display_result
         self._result = None
+        self._model = None
         self._panel_var = None
+        from tabra.core.result_store import ResultStore
+        self._results = ResultStore()
+
+    def _finalize_result(self, result, *, command, model=None):
+        result.set_style(self._style)
+        result.set_command(command)
+        self._result = result
+        self._model = model
+        self._results.add(result, command=command, model=model)
+        if self._is_display_result:
+            result.set_display(True)
+        return result
 
 
 def test_reg_assigns_style_updates_tabra_result_and_display(monkeypatch):
@@ -42,7 +59,7 @@ def test_reg_assigns_style_updates_tabra_result_and_display(monkeypatch):
     def _factory():
         return DummyModel(recorder)
 
-    monkeypatch.setattr("tabra.core.est_accessor.OLS", _factory)
+    monkeypatch.setattr("tabra.api.estimation.linear.OLS", _factory)
 
     tabra = DummyTabra(is_display_result=True)
     accessor = EstAccessor(tabra)
@@ -54,8 +71,10 @@ def test_reg_assigns_style_updates_tabra_result_and_display(monkeypatch):
     assert recorder["args"][2] == ["x"]
     assert recorder["kwargs"]["is_con"] is False
     assert result.style == "stata"
+    assert result.command == "reg y x, nocons"
     assert result.display_called is True
     assert tabra._result is result
+    assert tabra._model is not None
 
 
 def test_reg_no_display_when_disabled(monkeypatch):
@@ -64,7 +83,7 @@ def test_reg_no_display_when_disabled(monkeypatch):
     def _factory():
         return DummyModel(recorder)
 
-    monkeypatch.setattr("tabra.core.est_accessor.OLS", _factory)
+    monkeypatch.setattr("tabra.api.estimation.linear.OLS", _factory)
 
     tabra = DummyTabra(is_display_result=False)
     accessor = EstAccessor(tabra)
@@ -88,7 +107,7 @@ def test_xtreg_passes_panel_var_and_model_options(monkeypatch):
     def _factory():
         return DummyModel(recorder)
 
-    monkeypatch.setattr("tabra.core.est_accessor.PanelModel", _factory)
+    monkeypatch.setattr("tabra.api.estimation.panel.PanelModel", _factory)
 
     tabra = DummyTabra(is_display_result=False)
     tabra._panel_var = ("id", "year")

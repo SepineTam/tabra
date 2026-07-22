@@ -161,12 +161,14 @@ After fixing, run `/verify-command xxx` again for a second verification. Once it
 
 ```
 src/tabra/
-├── core/          # Core functionality (data loading, config)
-├── models/        # Model implementations
-│   └── estimate/  # Estimators (OLS, IV, panel, etc.)
-├── plot/          # Visualization
-├── io/            # Import/export
-└── utils/         # Utility functions
+├── api/estimation/   # tab.est commands grouped by model family
+├── core/             # Session state, configuration, result lifecycle
+├── data/             # Reusable data-processing components
+├── models/estimate/  # Numerical estimators (OLS, IV, panel, etc.)
+├── results/          # Result containers and display contracts
+├── plot/             # Visualization
+├── io/               # Import/export
+└── utils/            # Utility functions
 
 tests/
 ├── test_xxx.py    # Tests for corresponding command
