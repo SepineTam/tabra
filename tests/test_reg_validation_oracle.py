@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 REG_DIRECTORY = REPOSITORY_ROOT / "validation" / "commands" / "reg"
 ORACLE_PATH = REG_DIRECTORY / "oracles" / "code_audit_oracle.py"
@@ -84,3 +83,39 @@ def test_reg_oracle_formal_entry_passes(tmp_path):
         comparison["passed"]
         for comparison in oracle_result["comparisons"].values()
     )
+
+
+def test_python_runner_emits_frozen_case_provenance(tmp_path):
+    actual_path = tmp_path / "python-results.json"
+    runner = subprocess.run(
+        [
+            sys.executable,
+            str(REG_DIRECTORY / "python" / "run.py"),
+            "--data",
+            str(REG_DIRECTORY / "data" / "reg_fixture.csv"),
+            "--output",
+            str(actual_path),
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert runner.returncode == 0, runner.stderr
+
+    result = json.loads(actual_path.read_text(encoding="utf-8"))
+    assert result["schema_version"] == 2
+    assert result["metadata"]["cases_sha256"] == (
+        "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07"
+    )
+    assert result["metadata"]["case_execution"] == [
+        {
+            "case_id": case_id,
+            "seed": 20260722,
+            "included_row_sha256": (
+                "11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76"
+            ),
+            "omitted_parameters": [],
+        }
+        for case_id in ("basic", "no_constant")
+    ]

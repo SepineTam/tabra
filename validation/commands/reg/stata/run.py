@@ -12,11 +12,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REG_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REG_DIRECTORY))
 
-from runner_common import (  # noqa: E402
+from runner_common import (
     make_document,
     normalize_raw_tsv,
     verify_dataset,
@@ -68,13 +67,15 @@ def main() -> int:
     do_file = Path(__file__).with_name("run.do").resolve()
     with tempfile.TemporaryDirectory(prefix="tabra-reg-stata-") as temporary_directory:
         raw_path = Path(temporary_directory) / "stata-results.tsv"
+        sample_path = Path(temporary_directory) / "stata-samples.tsv"
         if stata_backend == "mcp":
             driver_path = Path(temporary_directory) / "driver.do"
             driver_source = do_file.read_text(encoding="utf-8")
             driver_source = driver_source.replace(
-                "args data_path output_path",
+                "args data_path output_path sample_path",
                 f'local data_path "{arguments.data.resolve()}"\n'
-                f'local output_path "{raw_path}"',
+                f'local output_path "{raw_path}"\n'
+                f'local sample_path "{sample_path}"',
                 1,
             )
             driver_path.write_text(driver_source, encoding="utf-8")
@@ -98,6 +99,7 @@ def main() -> int:
                 str(do_file),
                 str(arguments.data.resolve()),
                 str(raw_path),
+                str(sample_path),
             ]
         completed_process = subprocess.run(
             invocation,
@@ -106,13 +108,19 @@ def main() -> int:
             text=True,
             check=False,
         )
-        if completed_process.returncode != 0 or not raw_path.is_file():
+        if (
+            completed_process.returncode != 0
+            or not raw_path.is_file()
+            or not sample_path.is_file()
+        ):
             diagnostic = (completed_process.stderr or completed_process.stdout).strip()
             raise RuntimeError(
                 f"Stata reg validation failed with code {completed_process.returncode}: "
                 f"{diagnostic[-2000:]}"
             )
-        engine_version, cases = normalize_raw_tsv(raw_path)
+        engine_version, cases = normalize_raw_tsv(
+            raw_path, sample_path, arguments.data
+        )
 
     document = make_document(
         engine_name="stata",

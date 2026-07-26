@@ -111,6 +111,8 @@ class CommandManifest:
     command: str
     engines: tuple[str, ...]
     supported_cases: tuple[str, ...]
+    cases_sha256: str
+    seed: int
     data_sha256: str
     environment_requirements: Mapping[str, Any]
     metrics: tuple[MetricSpec, ...]
@@ -178,6 +180,8 @@ class NormalizedResult:
     skipped: bool
     nobs: int
     data_sha256: str
+    cases_sha256: str
+    case_execution: tuple[Mapping[str, Any], ...]
     metrics: Mapping[str, Any]
     metadata: Mapping[str, Any]
     source_path: str

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "specification_version": "2.0.2",
+  "specification_version": "2.0.3",
   "command": "reg",
   "public_api": "TabraData.est.reg(y, x, is_con=True)",
   "implementation": "src/tabra/models/estimate/ols.py::OLS.fit",
@@ -18,13 +18,19 @@
     "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"}
   },
   "supported_cases": ["basic", "no_constant"],
+  "cases": {
+    "path": "cases.yaml",
+    "sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07"
+  },
   "required_outputs": {
     "metadata": {
       "engine": {"type": "string", "unit": "identifier"},
       "engine_version": {"type": "string", "unit": "version"},
       "dataset_path": {"type": "string", "unit": "repository-relative path"},
       "dataset_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
-      "case_status": {"type": "object", "unit": "case counts"}
+      "cases_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
+      "case_status": {"type": "object", "unit": "case counts"},
+      "case_execution": {"type": "ordered array", "unit": "per-case execution evidence"}
     },
     "case": {
       "case_id": {"type": "string", "unit": "identifier"},
@@ -32,7 +38,10 @@
       "converged": {"type": "boolean", "allowed": [true]},
       "n_obs": {"type": "integer", "unit": "observations"},
       "df_model": {"type": "integer", "unit": "degrees of freedom"},
-      "df_resid": {"type": "integer", "unit": "degrees of freedom"}
+      "df_resid": {"type": "integer", "unit": "degrees of freedom"},
+      "seed": {"type": "integer", "unit": "random seed"},
+      "included_row_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
+      "omitted_parameters": {"type": "ordered array", "unit": "canonical parameter identifiers"}
     },
     "parameters": {
       "type": "ordered array",

@@ -314,8 +314,162 @@ def compare_results(
                     )
                 )
 
+    cases_hash_values = {
+        engine: results_by_engine[engine].cases_sha256
+        for engine in manifest.engines
+        if engine in results_by_engine
+    }
+    cases_hash_passed = (
+        len(cases_hash_values) == len(manifest.engines)
+        and all(
+            digest == manifest.cases_sha256
+            for digest in cases_hash_values.values()
+        )
+    )
+    for engine, digest in cases_hash_values.items():
+        if digest != manifest.cases_sha256:
+            violations.append(
+                _violation(
+                    "case_specification_hash_mismatch",
+                    "The engine result does not use the cases frozen by the manifest",
+                    engine=engine,
+                )
+            )
+
+    execution_order_passed: dict[str, bool] = {}
+    for engine in manifest.engines:
+        result = results_by_engine.get(engine)
+        if result is None:
+            execution_order_passed[engine] = False
+            continue
+        execution_case_ids = tuple(
+            str(case["case_id"]) for case in result.case_execution
+        )
+        passed = execution_case_ids == manifest.supported_cases
+        execution_order_passed[engine] = passed
+        if not passed:
+            violations.append(
+                _violation(
+                    "case_execution_mismatch",
+                    "Case execution must exactly match the frozen case order",
+                    engine=engine,
+                )
+            )
+
+    case_evidence_items: list[dict[str, Any]] = []
+    for case_index, case_id in enumerate(manifest.supported_cases):
+        execution_values: dict[str, Any] = {}
+        seed_values: dict[str, Any] = {}
+        included_row_values: dict[str, Any] = {}
+        omitted_parameter_values: dict[str, Any] = {}
+        for engine in manifest.engines:
+            result = results_by_engine.get(engine)
+            if result is None or case_index >= len(result.case_execution):
+                continue
+            case_execution = result.case_execution[case_index]
+            execution_values[engine] = case_execution["case_id"]
+            seed_values[engine] = case_execution["seed"]
+            included_row_values[engine] = case_execution["included_row_sha256"]
+            omitted_parameter_values[engine] = thaw_json(
+                case_execution["omitted_parameters"]
+            )
+
+        execution_passed = (
+            len(execution_values) == len(manifest.engines)
+            and all(value == case_id for value in execution_values.values())
+        )
+        seed_passed = (
+            len(seed_values) == len(manifest.engines)
+            and all(value == manifest.seed for value in seed_values.values())
+        )
+        included_row_passed = (
+            len(included_row_values) == len(manifest.engines)
+            and len(set(included_row_values.values())) == 1
+        )
+        omitted_parameters_passed = (
+            len(omitted_parameter_values) == len(manifest.engines)
+            and len(
+                {
+                    tuple(parameters)
+                    for parameters in omitted_parameter_values.values()
+                }
+            )
+            == 1
+        )
+        if not seed_passed:
+            violations.append(
+                _violation(
+                    "case_seed_mismatch",
+                    f"Case {case_id} must use the seed frozen by the manifest",
+                )
+            )
+        if not included_row_passed:
+            violations.append(
+                _violation(
+                    "included_row_hash_mismatch",
+                    f"Engines used different estimation rows for case {case_id}",
+                )
+            )
+        if not omitted_parameters_passed:
+            violations.append(
+                _violation(
+                    "omitted_parameters_mismatch",
+                    f"Engines omitted different parameters for case {case_id}",
+                )
+            )
+        case_passed = (
+            execution_passed
+            and seed_passed
+            and included_row_passed
+            and omitted_parameters_passed
+        )
+        case_evidence_items.append(
+            {
+                "case_id": case_id,
+                "case_execution": {
+                    "values": execution_values,
+                    "passed": execution_passed,
+                },
+                "seed": {
+                    "expected": manifest.seed,
+                    "values": seed_values,
+                    "passed": seed_passed,
+                },
+                "included_row_sha256": {
+                    "values": included_row_values,
+                    "passed": included_row_passed,
+                },
+                "omitted_parameters": {
+                    "values": omitted_parameter_values,
+                    "passed": omitted_parameters_passed,
+                },
+                "passed": case_passed,
+            }
+        )
+
+    provenance_blocking_codes = {
+        "dataset_hash_mismatch",
+        "sample_hash_mismatch",
+        "sample_size_mismatch",
+        "required_case_mismatch",
+        "case_specification_hash_mismatch",
+        "case_execution_mismatch",
+        "case_seed_mismatch",
+        "included_row_hash_mismatch",
+        "omitted_parameters_mismatch",
+    }
+    metric_comparison_performed = (
+        cases_hash_passed
+        and all(execution_order_passed.values())
+        and all(item["passed"] for item in case_evidence_items)
+        and not any(
+            violation["code"] in provenance_blocking_codes
+            for violation in violations
+        )
+    )
+
     metric_reports: list[dict[str, Any]] = []
-    for metric in manifest.metrics:
+    for metric in manifest.metrics if metric_comparison_performed else ():
         metric_values: dict[str, Any] = {}
         for engine in manifest.engines:
             result = results_by_engine.get(engine)
@@ -411,8 +565,21 @@ def compare_results(
             for engine, result in sorted(results_by_engine.items())
         },
         "engines": list(manifest.engines),
+        "case_evidence": {
+            "cases_sha256": {
+                "expected": manifest.cases_sha256,
+                "values": cases_hash_values,
+                "passed": cases_hash_passed,
+            },
+            "cases": case_evidence_items,
+        },
+        "metric_comparison_performed": metric_comparison_performed,
         "metrics": metric_reports,
         "violations": violations,
-        "passed": not violations and all(metric["passed"] for metric in metric_reports),
+        "passed": (
+            metric_comparison_performed
+            and not violations
+            and all(metric["passed"] for metric in metric_reports)
+        ),
     }
     return report

@@ -26,6 +26,8 @@ from tabra.validation import (
 from tabra.validation.cli import main
 
 DATA_SHA256 = "a" * 64
+CASES_SHA256 = "b" * 64
+INCLUDED_ROW_SHA256 = "c" * 64
 ENGINE_VERSIONS = {
     "python": "3.11.11",
     "stata": "19.5",
@@ -51,7 +53,8 @@ def _manifest_value() -> dict[str, object]:
             "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"},
         },
         "supported_cases": ["basic", "no_constant"],
-        "data": {"sha256": DATA_SHA256},
+        "cases": {"path": "cases.yaml", "sha256": CASES_SHA256},
+        "data": {"sha256": DATA_SHA256, "seed": 20260722},
         "metrics": {
             "case_ids": {"tolerance": {"exact": True}},
             "nobs": {"tolerance": {"exact": True}},
@@ -71,7 +74,7 @@ def _result_value(
     metrics: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "command": "reg",
         "engine": engine,
         "status": status,
@@ -89,6 +92,16 @@ def _result_value(
             "engine_version": ENGINE_VERSIONS[engine],
             "dataset_path": "/frozen/reg_fixture.csv",
             "case_status": ["completed", "completed"],
+            "cases_sha256": CASES_SHA256,
+            "case_execution": [
+                {
+                    "case_id": case_id,
+                    "seed": 20260722,
+                    "included_row_sha256": INCLUDED_ROW_SHA256,
+                    "omitted_parameters": [],
+                }
+                for case_id in ("basic", "no_constant")
+            ],
         },
     }
 
@@ -214,6 +227,8 @@ def test_manifest_retains_frozen_data_cases_and_engine_requirements(tmp_path):
     manifest = load_manifest(manifest_path)
 
     assert manifest.data_sha256 == DATA_SHA256
+    assert manifest.cases_sha256 == CASES_SHA256
+    assert manifest.seed == 20260722
     assert manifest.supported_cases == ("basic", "no_constant")
     assert manifest.environment_requirements["r"]["locked_version"] == "4.4.1"
 
@@ -252,7 +267,7 @@ def test_registry_resolves_manifests_and_blocks_path_escape(tmp_path):
 def test_normalized_result_rejects_duplicate_keys_and_nonfinite_json(tmp_path):
     duplicate_path = tmp_path / "duplicate.json"
     duplicate_path.write_text(
-        '{"schema_version": 1, "schema_version": 1}', encoding="utf-8"
+        '{"schema_version": 2, "schema_version": 2}', encoding="utf-8"
     )
     with pytest.raises(SchemaError, match="Duplicate JSON key"):
         load_normalized_result(duplicate_path)
@@ -286,6 +301,98 @@ def test_normalized_result_requires_complete_metadata(tmp_path, metadata):
         load_normalized_result(result_path)
 
 
+def test_normalized_result_requires_v2_provenance_contract(tmp_path):
+    value = _result_value("python")
+    value["schema_version"] = 1
+    result_path = _write_json(tmp_path / "python.json", value)
+    with pytest.raises(SchemaError, match="schema_version"):
+        load_normalized_result(result_path)
+
+    for missing_field in ("cases_sha256", "case_execution"):
+        value = _result_value("python")
+        value["metadata"].pop(missing_field)
+        _write_json(result_path, value)
+        with pytest.raises(SchemaError, match=missing_field):
+            load_normalized_result(result_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value"),
+    [
+        ("cases_sha256", "not-a-hash"),
+        ("seed", True),
+        ("included_row_sha256", "not-a-hash"),
+        ("omitted_parameters", ["x1", "x1"]),
+        ("omitted_parameters", [1]),
+    ],
+)
+def test_normalized_result_rejects_invalid_provenance(
+    tmp_path, field, invalid_value
+):
+    value = _result_value("python")
+    if field == "cases_sha256":
+        value["metadata"][field] = invalid_value
+    else:
+        value["metadata"]["case_execution"][0][field] = invalid_value
+    result_path = _write_json(tmp_path / "python.json", value)
+
+    with pytest.raises(SchemaError, match=field):
+        load_normalized_result(result_path)
+
+
+@pytest.mark.parametrize(
+    "case_execution",
+    [
+        [],
+        [
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            }
+        ],
+        [
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+        ],
+        [
+            {
+                "case_id": "no_constant",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+        ],
+    ],
+)
+def test_normalized_result_rejects_incomplete_duplicate_or_reordered_execution(
+    tmp_path, case_execution
+):
+    value = _result_value("python")
+    value["metadata"]["case_execution"] = case_execution
+    result_path = _write_json(tmp_path / "python.json", value)
+
+    with pytest.raises(SchemaError, match="case_execution"):
+        load_normalized_result(result_path)
+
+
 def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
     manifest, results, _ = _load_complete_case(tmp_path)
 
@@ -293,6 +400,9 @@ def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
 
     assert report["passed"] is True
     assert report["violations"] == []
+    assert report["metric_comparison_performed"] is True
+    assert report["case_evidence"]["cases_sha256"]["passed"] is True
+    assert all(case["passed"] for case in report["case_evidence"]["cases"])
     assert all(metric["passed"] for metric in report["metrics"])
     assert len(report["metrics"][1]["pairs"]) == 3
 
@@ -318,6 +428,59 @@ def test_comparison_rejects_shared_wrong_dataset(tmp_path):
     }
 
 
+def test_comparison_rejects_shared_wrong_cases_hash_without_majority_vote(tmp_path):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = []
+    for engine in ("python", "stata", "r"):
+        value = _result_value(engine)
+        value["metadata"]["cases_sha256"] = "d" * 64
+        result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert report["metric_comparison_performed"] is False
+    assert report["metrics"] == []
+    assert "case_specification_hash_mismatch" in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value", "expected_code"),
+    [
+        ("seed", 20260723, "case_seed_mismatch"),
+        ("included_row_sha256", "d" * 64, "included_row_hash_mismatch"),
+        ("omitted_parameters", ["x1"], "omitted_parameters_mismatch"),
+    ],
+)
+def test_comparison_stops_before_metrics_on_case_evidence_mismatch(
+    tmp_path, field, invalid_value, expected_code
+):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = []
+    for engine in ("python", "stata", "r"):
+        value = _result_value(engine)
+        if engine == "r":
+            value["metadata"]["case_execution"][0][field] = invalid_value
+        result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert report["metric_comparison_performed"] is False
+    assert report["metrics"] == []
+    assert expected_code in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
 def test_comparison_rejects_shared_case_omission(tmp_path):
     manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
     result_paths = []
@@ -331,6 +494,9 @@ def test_comparison_rejects_shared_case_omission(tmp_path):
             },
         )
         value["metadata"]["case_status"] = ["completed"]
+        value["metadata"]["case_execution"] = value["metadata"][
+            "case_execution"
+        ][:1]
         result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
 
     report = compare_results(

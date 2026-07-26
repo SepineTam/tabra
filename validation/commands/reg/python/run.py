@@ -15,7 +15,9 @@ REG_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REG_DIRECTORY))
 
 from runner_common import (
+    hash_included_row_ids,
     load_case_specifications,
+    load_raw_row_ids,
     make_document,
     verify_dataset,
     write_normalized_result,
@@ -24,9 +26,19 @@ from runner_common import (
 from tabra.models.estimate.ols import OLS
 
 
-def normalize_case(dataframe: pd.DataFrame, case_specification: dict) -> dict:
+def normalize_case(
+    dataframe: pd.DataFrame,
+    raw_row_ids: list[str],
+    case_specification: dict,
+) -> dict:
+    estimation_columns = [
+        case_specification["dependent"],
+        *case_specification["independent"],
+    ]
+    complete_case_mask = dataframe[estimation_columns].notna().all(axis=1)
+    estimation_dataframe = dataframe.loc[complete_case_mask]
     result = OLS().fit(
-        dataframe,
+        estimation_dataframe,
         y=case_specification["dependent"],
         x=case_specification["independent"],
         is_con=case_specification["include_constant"],
@@ -41,8 +53,27 @@ def normalize_case(dataframe: pd.DataFrame, case_specification: dict) -> dict:
         }
         for index, name in enumerate(result.var_names)
     ]
+    if int(complete_case_mask.sum()) != int(result.n_obs):
+        raise RuntimeError("Python estimation sample does not match result.n_obs")
+    included_row_ids = [
+        row_id
+        for row_id, included in zip(raw_row_ids, complete_case_mask, strict=True)
+        if included
+    ]
+    requested_parameters = [*case_specification["independent"]]
+    if case_specification["include_constant"]:
+        requested_parameters.append("_cons")
+    returned_parameters = set(result.var_names)
+    if not returned_parameters.issubset(requested_parameters):
+        raise RuntimeError("Python returned an unexpected parameter")
     return {
         "case_id": case_specification["case_id"],
+        "included_row_sha256": hash_included_row_ids(included_row_ids),
+        "omitted_parameters": [
+            parameter
+            for parameter in requested_parameters
+            if parameter not in returned_parameters
+        ],
         "status": "completed",
         "converged": True,
         "n_obs": int(result.n_obs),
@@ -73,8 +104,11 @@ def main() -> int:
     if len(dataframe) != n_rows:
         raise RuntimeError("Parsed row count differs from the verified CSV row count")
 
+    raw_row_ids = load_raw_row_ids(arguments.data)
+    if len(raw_row_ids) != n_rows:
+        raise RuntimeError("Raw row_id count differs from the verified CSV row count")
     cases = [
-        normalize_case(dataframe, case_specification)
+        normalize_case(dataframe, raw_row_ids, case_specification)
         for case_specification in load_case_specifications()
     ]
     try:
