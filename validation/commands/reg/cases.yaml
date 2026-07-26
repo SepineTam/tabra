@@ -4,21 +4,47 @@
   "cases": [
     {
       "case_id": "basic",
+      "seed": 20260722,
+      "data": {
+        "path": "data/reg_fixture.csv",
+        "sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4"
+      },
       "dependent": "y",
       "independent": ["x1", "x2"],
       "include_constant": true,
       "covariance": "homoskedastic",
       "r_formula": "y ~ x1 + x2",
-      "stata_command": "regress y x1 x2"
+      "stata_command": "regress y x1 x2",
+      "engine_arguments": {
+        "python": {"y": "y", "x": ["x1", "x2"], "is_con": true},
+        "stata": {"command": "regress y x1 x2"},
+        "r": {"function": "stats::lm", "formula": "y ~ x1 + x2"}
+      },
+      "expected_status": "completed",
+      "expected_convergence": true,
+      "tags": ["basic", "classical-vce", "intercept"]
     },
     {
       "case_id": "no_constant",
+      "seed": 20260722,
+      "data": {
+        "path": "data/reg_fixture.csv",
+        "sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4"
+      },
       "dependent": "y",
       "independent": ["x1", "x2"],
       "include_constant": false,
       "covariance": "homoskedastic",
       "r_formula": "y ~ x1 + x2 - 1",
-      "stata_command": "regress y x1 x2, noconstant"
+      "stata_command": "regress y x1 x2, noconstant",
+      "engine_arguments": {
+        "python": {"y": "y", "x": ["x1", "x2"], "is_con": false},
+        "stata": {"command": "regress y x1 x2, noconstant"},
+        "r": {"function": "stats::lm", "formula": "y ~ x1 + x2 - 1"}
+      },
+      "expected_status": "completed",
+      "expected_convergence": true,
+      "tags": ["edge", "classical-vce", "no-intercept"]
     }
   ],
   "excluded_cases": [

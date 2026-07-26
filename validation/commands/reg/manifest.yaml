@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "specification_version": "2.0.0",
   "command": "reg",
   "public_api": "TabraData.est.reg(y, x, is_con=True)",
   "implementation": "src/tabra/models/estimate/ols.py::OLS.fit",
@@ -17,6 +18,55 @@
     "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"}
   },
   "supported_cases": ["basic", "no_constant"],
+  "required_outputs": {
+    "metadata": {
+      "engine": {"type": "string", "unit": "identifier"},
+      "engine_version": {"type": "string", "unit": "version"},
+      "dataset_path": {"type": "string", "unit": "repository-relative path"},
+      "dataset_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
+      "case_status": {"type": "object", "unit": "case counts"}
+    },
+    "case": {
+      "case_id": {"type": "string", "unit": "identifier"},
+      "status": {"type": "string", "allowed": ["completed"]},
+      "converged": {"type": "boolean", "allowed": [true]},
+      "n_obs": {"type": "integer", "unit": "observations"},
+      "df_model": {"type": "integer", "unit": "degrees of freedom"},
+      "df_resid": {"type": "integer", "unit": "degrees of freedom"}
+    },
+    "parameters": {
+      "type": "ordered array",
+      "ordering": "requested independent variables followed by _cons only when include_constant is true",
+      "fields": {
+        "name": {"type": "string", "unit": "identifier"},
+        "estimate": {"type": "number", "unit": "dependent-variable units per regressor unit"},
+        "std_error": {"type": "number", "unit": "coefficient units"},
+        "statistic": {"type": "number", "unit": "t statistic"},
+        "p_value": {"type": "number", "unit": "probability"}
+      }
+    },
+    "statistics": {
+      "r_squared": {"type": "number", "unit": "proportion"},
+      "r_squared_adj": {"type": "number", "unit": "proportion"},
+      "f_stat": {"type": "number", "unit": "F statistic"},
+      "f_p_value": {"type": "number", "unit": "probability"},
+      "ss_residual": {"type": "number", "unit": "squared dependent-variable units"},
+      "ss_model": {"type": "number", "unit": "squared dependent-variable units"},
+      "ss_total": {"type": "number", "unit": "squared dependent-variable units"},
+      "root_mse": {"type": "number", "unit": "dependent-variable units"}
+    }
+  },
+  "estimation_contract": {
+    "sample_selection": "complete cases across y and every requested x",
+    "missing_values": "drop a row when y or any requested x is missing",
+    "constant": "append one fitted constant named _cons only when is_con is true",
+    "weights": "unsupported; every case is unweighted",
+    "base_category": "not applicable",
+    "convergence": "closed-form least squares must complete with a full-rank design and finite outputs",
+    "vce": "homoskedastic s^2 (X'X)^-1 with s^2 = RSS / (N-k)",
+    "small_sample_correction": "residual variance divisor is N-k",
+    "degrees_of_freedom": "df_model=k-c and df_resid=N-k, where c indicates a fitted constant"
+  },
   "unsupported_options": [
     {
       "option": "robust",
@@ -56,6 +106,29 @@
     "A dataset SHA-256 mismatch is a validation failure.",
     "Engine agreement does not override a contradiction with the independent formula oracle."
   ],
+  "release_policy": {
+    "release_critical_metrics": [
+      "case_ids",
+      "nobs",
+      "df_model",
+      "df_resid",
+      "parameter_names",
+      "coefficients",
+      "standard_errors",
+      "test_statistics",
+      "p_values",
+      "r_squared",
+      "r_squared_adj",
+      "f_stat",
+      "f_p_value",
+      "ss_residual",
+      "ss_model",
+      "ss_total",
+      "root_mse"
+    ],
+    "informational_metrics": [],
+    "skip_policy": "any skipped, missing, errored, or nonconverged required case blocks release"
+  },
   "data": {
     "generator": "data/generate.py",
     "seed": 20260722,
@@ -65,5 +138,17 @@
   },
   "theory": "theory.md",
   "formula_map": "formula_map.csv",
+  "primary_sources": [
+    {
+      "id": "stata-regress-19",
+      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress",
+      "url": "https://www.stata.com/manuals/rregress.pdf"
+    },
+    {
+      "id": "aitken-1936",
+      "citation": "Aitken (1936), On Least Squares and Linear Combination of Observations",
+      "doi": "10.1017/S0370164600014346"
+    }
+  ],
   "normalized_result_schema": "../../schema/normalized-result.schema.json"
 }
