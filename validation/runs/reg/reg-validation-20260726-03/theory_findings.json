@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-03",
+  "audit_date": "2026-07-26",
+  "theory_audit_status": "PASS",
+  "audited_commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+  "gate_decision_issued": false,
+  "blocked_environment": false,
+  "frozen_inputs": {
+    "commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+    "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "theory_sha256": "fd71801b0d33503cf2acd224edb7662904c8de7de89cc2bd15c82dfcc047fb8c",
+    "formula_map_sha256": "5b3c7233a6522311ceed5936a72433d6c52f46596a92353b96aa8d90dad07eb0",
+    "independent_oracle_sha256": "41a47dcda1e3f83a4b21cada2098e001ff861b00ed9a6eb100dfce87b09e438c",
+    "tracked_worktree_clean": true
+  },
+  "formula_map_summary": {
+    "row_count": 20,
+    "implemented": 19,
+    "blocked_unsupported": 1,
+    "normalized_release_critical_metric_count": 18,
+    "supported_normalized_metric_coverage": true,
+    "complete_public_report_coverage": true,
+    "complete_release_critical_coverage": true
+  },
+  "authoritative_sources": [
+    {
+      "citation": "Lai, T. L. and Xing, H. (2008), Statistical Models and Methods for Financial Markets, Springer Texts in Statistics.",
+      "doi": "https://doi.org/10.1007/978-0-387-77827-3",
+      "chapter_doi": "https://doi.org/10.1007/978-0-387-77827-3_1",
+      "locations": [
+        "p. 4 eq. (1.2)",
+        "p. 5 eqs. (1.4)-(1.5) and RSS definition",
+        "p. 7 eqs. (1.9)-(1.10)",
+        "pp. 8-10 eqs. (1.11)-(1.15) and (1.22)",
+        "pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1",
+        "pp. 13-14 eqs. (1.27)-(1.28)"
+      ],
+      "role": "primary mathematical and inferential support"
+    },
+    {
+      "citation": "Fisher, R. A. (1922), The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients, Journal of the Royal Statistical Society 85(4):597-612.",
+      "doi": "https://doi.org/10.2307/2341124",
+      "institutional_record": "http://hdl.handle.net/2440/15174",
+      "locations": [
+        "journal pp. 607-610, section 6"
+      ],
+      "role": "original finite-sample regression-coefficient distribution support; not modern matrix notation"
+    },
+    {
+      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress.",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "locations": [
+        "p. 7",
+        "pp. 8-10",
+        "p. 15",
+        "p. 22 eq. (2) and ANOVA definitions",
+        "p. 23 eq. (3)",
+        "p. 26"
+      ],
+      "role": "authoritative software-compatibility and reporting-parameterization documentation; not mathematical proof"
+    }
+  ],
+  "verified_checks": [
+    {
+      "check_id": "VC-REG-03-001",
+      "subject": "all frozen inputs",
+      "status": "verified",
+      "evidence": "Commit and all seven frozen SHA-256 values match exactly."
+    },
+    {
+      "check_id": "VC-REG-03-002",
+      "subject": "primary mathematical locations",
+      "status": "verified",
+      "evidence": "Lai and Xing printed pp. 4-14 and equations (1.2), (1.4)-(1.5), (1.9)-(1.15), (1.22)-(1.25), and (1.27)-(1.28), including Table 1.1, were checked against the source."
+    },
+    {
+      "check_id": "VC-REG-03-003",
+      "subject": "Fisher original source",
+      "status": "verified",
+      "evidence": "Journal pp. 607-610 were checked from the preserved institutional scan, including the n-2 simple-regression divisor and p+1-constant extension."
+    },
+    {
+      "check_id": "VC-REG-03-004",
+      "subject": "Stata compatibility role",
+      "status": "verified",
+      "evidence": "The official manual supports missing-value, constant/no-constant, ANOVA, homoskedastic VCE, t/F-tail, and N-k confidence-interval conventions and was not treated as mathematical or implementation proof."
+    },
+    {
+      "check_id": "VC-REG-03-005",
+      "subject": "REG-CI95-001",
+      "status": "verified",
+      "source_location": "Lai and Xing (2008), p. 8 eq. (1.15); Stata 19 [R] regress p. 26 for the N-k compatibility parameterization",
+      "code_locations": [
+        "src/tabra/results/ols_result.py:155-166",
+        "src/tabra/models/estimate/ols.py:89-90"
+      ],
+      "test_id": "tests/test_ols_result.py::TestCoefficientConfidenceInterval::test_95_percent_confidence_interval_uses_t_distribution",
+      "parameter_sets": [
+        "is_con=True",
+        "is_con=False"
+      ],
+      "test_result": "PASS",
+      "limitation": "Exact finite-sample 95% coverage requires conditionally spherical normal errors; robust and cluster intervals are unsupported."
+    },
+    {
+      "check_id": "VC-REG-03-006",
+      "subject": "REG-NOCONSTANT-001 public Total df and MS",
+      "status": "verified",
+      "source_location": "Stata 19 [R] regress pp. 9-10 and 22-23",
+      "code_locations": [
+        "src/tabra/results/ols_result.py:107-152",
+        "src/tabra/models/estimate/ols.py:74-90"
+      ],
+      "test_id": "tests/test_ols_result.py::TestAnovaAlignment::test_total_df_and_ms_follow_constant_convention",
+      "test_result": "PASS",
+      "evidence": "The rendered Total row is checked for df=N and MS=TSS/N without a constant, and df=N-1 and MS=TSS/(N-1) with a constant."
+    },
+    {
+      "check_id": "VC-REG-03-007",
+      "subject": "partial-missing mapping",
+      "status": "verified",
+      "source_location": "Stata 19 [R] regress p. 15",
+      "code_locations": [
+        "src/tabra/models/estimate/base.py:19-23",
+        "src/tabra/models/estimate/ols.py:36"
+      ],
+      "test_id": "tests/test_ols.py::test_partial_missing_rows_use_joint_complete_case_sample",
+      "test_result": "PASS",
+      "limitation": "The frozen three-engine fixture contains no missing values and the test does not establish an ignorable missingness mechanism."
+    },
+    {
+      "check_id": "VC-REG-03-008",
+      "subject": "source-role separation",
+      "status": "verified",
+      "test_id": "tests/test_validation_core.py::test_reg_formula_map_separates_mathematical_and_compatibility_sources",
+      "test_result": "PASS"
+    },
+    {
+      "check_id": "VC-REG-03-009",
+      "subject": "independent normalized formula oracle",
+      "status": "verified",
+      "result": "PASS",
+      "cases": [
+        "basic",
+        "no_constant"
+      ],
+      "hash_checks_passed": true,
+      "all_metric_comparisons_passed": true,
+      "limitation": "Executable agreement is implementation evidence, not mathematical proof."
+    }
+  ],
+  "findings": [],
+  "execution_evidence": {
+    "targeted_tests": {
+      "environment": ".venv/bin/python",
+      "coverage_disabled_for_targeted_run": true,
+      "result": "76 passed",
+      "includes": [
+        "tests/test_ols.py",
+        "tests/test_ols_result.py",
+        "tests/test_estimate_base_stats.py",
+        "tests/ops/test_stats.py",
+        "tests/test_reg_validation_oracle.py",
+        "tests/test_validation_core.py::test_reg_formula_map_separates_mathematical_and_compatibility_sources"
+      ]
+    },
+    "independent_oracle": {
+      "oracle_status": "PASS",
+      "oracle_is_independent": true,
+      "imports_tabra": false,
+      "hash_checks_passed": true,
+      "status_checks_passed": true,
+      "all_metric_comparisons_passed": true
+    }
+  },
+  "decision_reasons": [
+    "All 18 normalized release-critical metrics have primary or authoritative support appropriate to their role and complete code/test mappings.",
+    "REG-CI95-001 maps the exact two-sided 95% t interval and its N-k parameterization to public-summary code and a numerical test covering both constant conventions.",
+    "REG-NOCONSTANT-001 maps public Total df=N and Total MS=TSS/N to the exact rendered-summary test.",
+    "Mathematical sources and software-compatibility documentation are explicitly separated.",
+    "Primary sources, authoritative documentation, source locations, and tests were accessible, so BLOCKED_ENV does not apply.",
+    "This theory audit does not issue the final validation gate decision."
+  ]
+}

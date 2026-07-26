@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-04",
+  "code_audit_status": "PASS",
+  "audited_commit": "47aebd1b2681607027a70275eb443060c5df0457",
+  "gate_decision_issued": false,
+  "worktree_tracked_clean": true,
+  "completed_at": "2026-07-26T14:35:32Z",
+  "frozen_inputs": {
+    "manifest_sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "theory_sha256": "fd71801b0d33503cf2acd224edb7662904c8de7de89cc2bd15c82dfcc047fb8c",
+    "formula_map_sha256": "5b3c7233a6522311ceed5936a72433d6c52f46596a92353b96aa8d90dad07eb0",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "oracle_sha256": "0d9ea04248ca057d09ccaa0feb1d7c2510f6435ff6fe2e4ced85d03509cb6d68",
+    "normalized_result_schema_sha256": "05823ed8e65c55dab2db5d308305e1293fc433c3492511f32d85142d83a60a89",
+    "commit": "47aebd1b2681607027a70275eb443060c5df0457"
+  },
+  "environment": {
+    "platform": "Darwin 25.3.0 arm64",
+    "python": "3.11.11",
+    "numpy": "2.4.3",
+    "scipy": "1.17.1",
+    "pytest": "9.0.2",
+    "uv": "0.11.28",
+    "preflight_status": "PASS",
+    "required_engines_available": [
+      "python",
+      "stata",
+      "r"
+    ]
+  },
+  "source_sha256": {
+    "src/tabra/models/estimate/ols.py": "37712b20fb308b0582a84b9f5b725a69828e0f474531c13f879b5520aa94ea71",
+    "src/tabra/models/estimate/base.py": "e43d7f01b0ec8f268a1a81077e18a50427a9ad787380c85304e64682da36f28f",
+    "src/tabra/models/estimate/stats.py": "bab3ffd3156772b1b6cd9c3556d081883c3cba47198ca26682d483f0b006e0c4",
+    "src/tabra/ops/stats.py": "2d9b774d3d55fb9a5b7ba972b5b0da0cada8dfe54346c79f2f8ed749af9f635c",
+    "src/tabra/results/ols_result.py": "dbc39dc09b472fb91a1b59a1e429a315bfd1c7e89595c057c56275f0f61992d0",
+    "src/tabra/api/estimation/linear.py": "598bdf96982adb5bd4f08e9085ab3c8072c880c40ff8fb7ba14d1328fc9950b5",
+    "validation/commands/reg/python/run.py": "378686c63cfd5900fd2568bbd8fba101e35816bcb52415599c57bc74c92c6c00",
+    "validation/commands/reg/runner_common.py": "7dfa083e6cd729426c73fd467a9e8e00501327570ad340d2b88b1b477bcebea3",
+    "validation/commands/reg/stata/run.py": "7ddd491fbb2f72770e4c86e9843ebe27c62eda5541873227f1276aed1594f8d3",
+    "validation/commands/reg/stata/run.do": "6c26eaa4c0267366ebdc52de2ad5b58a25c308c6833c7b5475fe139d70811614",
+    "validation/commands/reg/r/run.py": "da1b9cf6b17ed3f301d8bdfc26960afc94f4665af4aebf06d7848b57f792efb3",
+    "validation/commands/reg/r/run.R": "4d241a3ff35092ec5b8c1b429b81a517e2830fa9a436878ab490c99890fbb9e3"
+  },
+  "oracle": {
+    "path": "validation/commands/reg/oracles/code_audit_oracle.py",
+    "sha256": "0d9ea04248ca057d09ccaa0feb1d7c2510f6435ff6fe2e4ced85d03509cb6d68",
+    "independent": true,
+    "imports_tabra": false,
+    "formal_entry_exit_code": 0,
+    "status": "PASS",
+    "hash_checks_passed": 3,
+    "status_checks_passed": 5,
+    "release_critical_metrics_passed": 17,
+    "release_critical_metrics_failed": 0,
+    "metric_max_abs_error": {
+      "coefficients": 1.3322676295501878e-15,
+      "standard_errors": 2.7755575615628914e-17,
+      "test_statistics": 1.4210854715202004e-14,
+      "p_values": 5.285485590866834e-19,
+      "f_stat": 0.0,
+      "f_p_value": 0.0,
+      "r_squared": 0.0,
+      "r_squared_adj": 0.0,
+      "ss_residual": 0.0,
+      "ss_model": 0.0,
+      "ss_total": 0.0,
+      "root_mse": 0.0
+    },
+    "probability_zero_mismatch": {
+      "p_values": false,
+      "f_p_value": false
+    },
+    "case_invariants": {
+      "basic": {
+        "rank": 3,
+        "n_parameters": 3,
+        "condition_number_x": 1.3527822358056734,
+        "normal_equation_max_abs": 4.1300296516055823e-14,
+        "ss_decomposition_abs_error": 3.552713678800501e-14,
+        "residual_sum_abs": 3.3084646133829665e-14
+      },
+      "no_constant": {
+        "rank": 2,
+        "n_parameters": 2,
+        "condition_number_x": 1.329450709440245,
+        "normal_equation_max_abs": 9.769962616701378e-15,
+        "ss_decomposition_abs_error": 0.0
+      }
+    },
+    "guard_mutation": {
+      "mutation": "one trailing line feed added to a temporary manifest copy",
+      "exit_code": 1,
+      "status": "REJECTED",
+      "error": "RuntimeError: Frozen input hash mismatch",
+      "mutated_manifest_sha256": "29f13e43f918347172a9d5ac6950b1bfce6c9efc5dbbc58a05bb84b3e0f7b419"
+    }
+  },
+  "fixture_reproducibility": {
+    "seed": 20260722,
+    "generated_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "byte_identical_to_frozen_fixture": true
+  },
+  "audit_surface": {
+    "sample": "Joint complete cases over y and requested x; unused columns do not affect the sample; row order is preserved and hashed.",
+    "design": "Requested x order is preserved; _cons is appended last only when is_con is true; exact rank deficiency is rejected.",
+    "objective": "Scaled rank-revealing least squares minimizes (y-Xb)'(y-Xb); beta is mapped back to original units.",
+    "derivatives": "Independent gradient is -2X'(y-Xb), Hessian is 2X'X, and the frozen normal-equation residuals are near machine precision.",
+    "covariance": "Only homoskedastic s2(X'X)^-1 is supported, with s2=RSS/(N-k); the SVD row-norm implementation matches the independent oracle.",
+    "degrees_of_freedom": "df_model=k-c and df_resid=N-k; no-constant TSS, adjusted R-squared, F, and Total df use c=0 conventions.",
+    "probabilities": "Two-sided t and right-tail F probabilities use SciPy survival functions and preserve representable nonzero tails.",
+    "failure_modes": "Empty complete samples, N<=k, non-finite inputs, rank deficiency, and non-finite numerical paths fail explicitly; exact-fit inference is represented as undefined rather than false zero probability.",
+    "provenance": "Each normalized engine result carries the frozen cases hash, seed, ordered included-row hash, and omitted-parameter list; comparison rejects disagreement before metric comparison.",
+    "not_applicable": [
+      "weights",
+      "categorical base encoding",
+      "constraints",
+      "absorbed fixed effects",
+      "singleton handling",
+      "robust covariance",
+      "cluster covariance",
+      "bootstrap covariance",
+      "iterative convergence",
+      "separation",
+      "censoring",
+      "empty groups"
+    ]
+  },
+  "tests": {
+    "preflight_command": "uv run python -m tabra.validation preflight --manifest validation/commands/reg/manifest.yaml",
+    "preflight_status": "PASS",
+    "relevant_command": "uv run pytest -q -o addopts='' tests/test_ols.py tests/test_estimate_base_stats.py tests/test_ols_result.py tests/test_api.py tests/ops/test_stats.py tests/test_reg_validation_oracle.py tests/test_reg_runner_common.py tests/test_validation_core.py",
+    "relevant_counts": {
+      "passed": 148,
+      "failed": 0,
+      "skipped": 0,
+      "warnings": 0
+    },
+    "full_suite_command": "uv run pytest tests/ -v",
+    "full_suite_counts": {
+      "passed": 807,
+      "failed": 0,
+      "skipped": 52,
+      "warnings": 6
+    },
+    "full_suite_duration_seconds": 220.0,
+    "full_suite_coverage_percent": 82.17,
+    "skip_disposition": "All 52 skips belong to other estimator modules; none is a required reg check and none was counted as passing evidence.",
+    "warning_disposition": "All six warnings are plotting-backend or Matplotlib deprecation warnings outside the reg estimation and validation paths."
+  },
+  "unverified_areas": [
+    "Robust, clustered, bootstrap, weighted, categorical, absorbed-effect, and constrained regression are unsupported by the public reg API and are not passed by this audit.",
+    "Python-Stata-R agreement is evaluated by the separate three-engine comparison stage; this code audit does not issue that comparison or a final attestation.",
+    "The frozen fixture is well-conditioned; broader platform and BLAS variation remains a residual reproducibility risk outside this single macOS arm64 environment."
+  ],
+  "findings": [],
+  "summary": {
+    "blocking_environment_findings": 0,
+    "open_p0_findings": 0,
+    "open_p1_findings": 0,
+    "open_in_scope_p2_findings": 0,
+    "open_code_defects": 0,
+    "release_critical_metrics_passed": 17,
+    "release_critical_metrics_failed": 0
+  }
+}

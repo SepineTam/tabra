@@ -1,0 +1,9 @@
+{"at":"2026-07-26T12:52:28Z","from":null,"to":"DISCOVERED","reason":"Created a fresh run after evidence-chain repair."}
+{"at":"2026-07-26T12:52:28Z","from":"DISCOVERED","to":"SPEC_PENDING","reason":"Revalidated the repaired immutable command contract."}
+{"at":"2026-07-26T12:52:28Z","from":"SPEC_PENDING","to":"SPEC_READY","reason":"Preflight and 95 targeted evidence tests passed for specification 2.0.1."}
+{"at":"2026-07-26T12:52:28Z","from":"SPEC_READY","to":"AUDIT_PENDING","reason":"Dispatched new independent code and theory audits."}
+{"at":"2026-07-26T13:16:20Z","from":"AUDIT_PENDING","to":"NEEDS_REPAIR","reason":"Code audit passed; theory audit found two remaining public-report traceability gaps."}
+{"at":"2026-07-26T13:16:20Z","from":"NEEDS_REPAIR","to":"REPAIR_ANALYSIS","reason":"Started bounded analysis for confidence-interval and no-constant summary mappings."}
+{"at":"2026-07-26T13:22:34Z","from":"REPAIR_ANALYSIS","to":"REPAIR_IMPLEMENTATION","reason":"Approved minimal public-summary traceability repair with no product-code changes."}
+{"at":"2026-07-26T13:27:53Z","from":"REPAIR_IMPLEMENTATION","to":"REPAIRED","reason":"Committed confidence-interval and no-constant summary mappings at 64c92fe6b136b5b3adc12895d408e5c20af9214c."}
+{"at":"2026-07-26T13:27:53Z","from":"REPAIRED","to":"RERUN_PENDING","reason":"Closed this run to new evidence and created the third fresh immutable run."}

@@ -1,0 +1,9 @@
+{"at":"2026-07-26T12:14:24Z","from":null,"to":"DISCOVERED","reason":"Selected highest-priority enabled registry command."}
+{"at":"2026-07-26T12:14:24Z","from":"DISCOVERED","to":"SPEC_PENDING","reason":"Started immutable command contract verification."}
+{"at":"2026-07-26T12:14:24Z","from":"SPEC_PENDING","to":"SPEC_READY","reason":"Preflight passed with frozen tolerances, data hash, cases, outputs, engine mappings, and source identifiers."}
+{"at":"2026-07-26T12:14:24Z","from":"SPEC_READY","to":"AUDIT_PENDING","reason":"Dispatched independent code and theory audits."}
+{"at":"2026-07-26T12:27:51Z","from":"AUDIT_PENDING","to":"NEEDS_REPAIR","reason":"Code audit was BLOCKED_ENV by stale oracle hashes and theory audit found release-critical evidence gaps."}
+{"at":"2026-07-26T12:27:51Z","from":"NEEDS_REPAIR","to":"REPAIR_ANALYSIS","reason":"Started independent root-cause and bounded-fix analysis."}
+{"at":"2026-07-26T12:43:37Z","from":"REPAIR_ANALYSIS","to":"REPAIR_IMPLEMENTATION","reason":"Approved minimal evidence-chain repair with no product estimator changes."}
+{"at":"2026-07-26T12:52:28Z","from":"REPAIR_IMPLEMENTATION","to":"REPAIRED","reason":"Committed oracle, independent sample test, and source-role mapping repairs at 4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd."}
+{"at":"2026-07-26T12:52:28Z","from":"REPAIRED","to":"RERUN_PENDING","reason":"Closed this run to new evidence and created a fresh immutable rerun."}

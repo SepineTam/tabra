@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-03",
+  "status": "RERUN_PENDING",
+  "attempt": 3,
+  "retry_limit": 3,
+  "git_commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+  "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+  "created_at": "2026-07-26T13:27:53Z",
+  "updated_at": "2026-07-26T14:27:08Z"
+}

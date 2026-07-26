@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-26T12:52:28Z",
+  "platform": {"system": "Darwin", "kernel": "25.3.0", "architecture": "arm64", "macos": "26.3"},
+  "engines": {
+    "python": {"version": "3.11.11", "executable": ".venv/bin/python"},
+    "stata": {"version": "19.5", "executable": "/usr/local/bin/stata-mp"},
+    "r": {"version": "4.4.1", "executable": "/usr/local/bin/Rscript", "lockfile": "validation/commands/reg/r/renv.lock"}
+  },
+  "tooling": {"uv": "0.11.28"},
+  "tracked_worktree_clean_at_capture": true
+}

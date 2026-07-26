@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-02",
+  "code_audit_status": "PASS",
+  "audited_commit": "4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+  "worktree_tracked_clean": true,
+  "frozen_inputs": {
+    "manifest_sha256": "3ace49ec0668c8deb699db3e6db90ade5f7e7a8105c61ff9163dd438c628068e",
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "oracle_sha256": "007099d58e6a26ba4e0eb3236537d004e453b14595b3ec78a4012dfc954ea3af",
+    "commit": "4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+  },
+  "environment": {
+    "python": "3.11.11",
+    "numpy": "2.4.3",
+    "scipy": "1.17.1",
+    "pandas": "3.0.1",
+    "pytest": "9.0.2"
+  },
+  "source_hashes": {
+    "src/tabra/models/estimate/ols.py": "37712b20fb308b0582a84b9f5b725a69828e0f474531c13f879b5520aa94ea71",
+    "src/tabra/models/estimate/base.py": "e43d7f01b0ec8f268a1a81077e18a50427a9ad787380c85304e64682da36f28f",
+    "src/tabra/models/estimate/stats.py": "bab3ffd3156772b1b6cd9c3556d081883c3cba47198ca26682d483f0b006e0c4",
+    "src/tabra/ops/stats.py": "2d9b774d3d55fb9a5b7ba972b5b0da0cada8dfe54346c79f2f8ed749af9f635c",
+    "src/tabra/results/ols_result.py": "dbc39dc09b472fb91a1b59a1e429a315bfd1c7e89595c057c56275f0f61992d0"
+  },
+  "oracle": {
+    "path": "validation/commands/reg/oracles/code_audit_oracle.py",
+    "sha256": "007099d58e6a26ba4e0eb3236537d004e453b14595b3ec78a4012dfc954ea3af",
+    "imports_tabra": false,
+    "formal_entry_status": "PASS",
+    "formal_entry_exit_code": 0,
+    "guard_bypassed": false,
+    "hash_checks": {
+      "manifest": true,
+      "cases": true,
+      "data": true
+    },
+    "status_checks": {
+      "document_completed": true,
+      "document_converged": true,
+      "document_not_skipped": true,
+      "sample_nobs": true,
+      "sample_data_sha256": true
+    },
+    "failed_metrics": [],
+    "max_abs_errors": {
+      "coefficients": 1.3322676295501878e-15,
+      "standard_errors": 2.7755575615628914e-17,
+      "test_statistics": 1.4210854715202004e-14,
+      "p_values": 5.285485590866834e-19,
+      "f_stat": 0.0,
+      "f_p_value": 0.0
+    },
+    "case_invariants": {
+      "basic": {
+        "rank": 3,
+        "n_parameters": 3,
+        "condition_number_x": 1.3527822358056734,
+        "normal_equation_max_abs": 4.1300296516055823e-14,
+        "ss_decomposition_abs_error": 3.552713678800501e-14,
+        "residual_sum_abs": 3.3084646133829665e-14
+      },
+      "no_constant": {
+        "rank": 2,
+        "n_parameters": 2,
+        "condition_number_x": 1.329450709440245,
+        "normal_equation_max_abs": 9.769962616701378e-15,
+        "ss_decomposition_abs_error": 0.0,
+        "residual_sum_abs": 0.0
+      }
+    },
+    "stale_input_guard": {
+      "status": "PASS",
+      "probe": "manifest copy with one trailing newline",
+      "exit_code": 1,
+      "error": "RuntimeError: Frozen input hash mismatch"
+    }
+  },
+  "independent_checks": {
+    "partial_missing": {
+      "status": "PASS",
+      "retained_source_rows_zero_based": [0, 2, 4, 6, 7, 8],
+      "n_obs": 6,
+      "parameter_names": ["x2", "x1", "_cons"],
+      "unused_missing_row_retained": true,
+      "max_coefficient_abs_error": 3.774758283725532e-15,
+      "max_standard_error_abs_error": 8.881784197001252e-16,
+      "max_residual_abs_error": 7.105427357601002e-15,
+      "oracle": "Direct NumPy lstsq, residual algebra, and inverse-XTX covariance in tests/test_ols.py::test_partial_missing_rows_use_joint_complete_case_sample"
+    },
+    "stability": {
+      "uniform_scale": 1e-8,
+      "condition_number_x": 1.1760999150110116,
+      "max_fitted_scale_error": 2.220446049250313e-16,
+      "max_rescaled_coefficient_error": 1.1102230246251565e-16,
+      "max_row_reversal_coefficient_error": 2.220446049250313e-16,
+      "max_row_reversal_standard_error_error": 1.0842021724855044e-18
+    },
+    "tail_probabilities": {
+      "t_sf_at_20_df_100": 9.994267861337003e-37,
+      "t_one_minus_cdf": 0.0,
+      "f_sf_at_500_df_3_100": 4.846696230808534e-60,
+      "f_one_minus_cdf": 0.0
+    },
+    "failure_modes": {
+      "rank_deficient": "ValueError: OLS design is rank deficient: rank=2, k=3",
+      "infinite_input": "ValueError: OLS inputs must contain only finite values",
+      "all_missing": "ValueError: OLS requires at least one complete observation",
+      "n_equals_k": "ValueError: OLS requires positive residual degrees of freedom: n=2, k=2",
+      "categorical": "ValueError: could not convert string to float: 'a'",
+      "extreme_1e200_core_outputs_finite": true,
+      "zero_response_inference_nan": true,
+      "intercept_only_df_model": 0,
+      "intercept_only_f_inference_nan": true
+    },
+    "unsupported_not_counted_as_pass": [
+      "weights",
+      "robust covariance",
+      "clustered covariance",
+      "bootstrap covariance",
+      "absorbed effects",
+      "singleton handling",
+      "categorical encoding"
+    ]
+  },
+  "tests": {
+    "focused_command": ".venv/bin/pytest --no-cov -q tests/test_ols.py tests/test_ols_result.py tests/test_estimate_base_stats.py tests/ops/test_stats.py tests/test_api.py tests/test_reg_validation_oracle.py tests/test_validation_core.py",
+    "focused_status": "PASS",
+    "focused_counts": {
+      "passed": 126,
+      "failed": 0,
+      "skipped": 0
+    },
+    "focused_duration_seconds": 3.65,
+    "full_suite_command": ".venv/bin/pytest --no-cov -q",
+    "full_suite_status": "PASS",
+    "full_suite_counts": {
+      "passed": 785,
+      "failed": 0,
+      "skipped": 52,
+      "warnings": 6
+    },
+    "full_suite_duration_seconds": 144.63,
+    "skip_disposition": "Full-suite skips are outside the required reg checks and were not counted as passing audit evidence."
+  },
+  "summary": {
+    "blocking_environment_findings": 0,
+    "open_code_defects": 0,
+    "prior_findings_closed": 6,
+    "partial_missing_independent_check": "PASS"
+  },
+  "findings": [
+    {
+      "finding_id": "REG-CODE-001",
+      "severity": "CRITICAL",
+      "status": "CLOSED",
+      "title": "Tail probabilities preserve representable nonzero values",
+      "formula_or_invariant": "Coefficient p=2*P(T_df>=abs(t)) and model p=P(F>=f) must use stable right-tail evaluation and satisfy reject_zero_mismatch.",
+      "source_locations": [
+        "src/tabra/ops/stats.py:40-64@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/models/estimate/ols.py:136-150@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+      ],
+      "affected_cases": ["basic", "no_constant"],
+      "evidence": {
+        "basic_p_values": [5.089289619277885e-93, 3.4212390558695086e-38, 1.1031530193039544e-78],
+        "no_constant_p_values": [6.954966563121992e-26, 3.8410727594931455e-05],
+        "f_p_values": [5.790493786860803e-92, 6.324940034154269e-25],
+        "extreme_t_tail": 9.994267861337003e-37,
+        "extreme_f_tail": 4.846696230808534e-60
+      },
+      "reproduction_steps": [
+        "Run tests/ops/test_stats.py with --no-cov.",
+        "Run the guarded formal oracle against the current Python normalized result."
+      ],
+      "disposition": "CLOSED. Production and the independent oracle use survival functions; all frozen zero-mismatch checks pass."
+    },
+    {
+      "finding_id": "REG-CODE-002",
+      "severity": "HIGH",
+      "status": "CLOSED",
+      "title": "Scaled rank-revealing least squares closes scale and near-collinearity failures",
+      "formula_or_invariant": "Nonzero column rescaling preserves rank and fitted values after reciprocal coefficient mapping; full-rank ill-conditioned designs require a rank-revealing solve.",
+      "source_locations": [
+        "src/tabra/models/estimate/ols.py:54-67@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/models/estimate/ols.py:92-106@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+      ],
+      "affected_cases": ["basic", "no_constant", "full-rank scaled or near-collinear public inputs"],
+      "evidence": {
+        "uniform_scale": 1e-8,
+        "max_fitted_difference": 2.220446049250313e-16,
+        "max_rescaled_coefficient_difference": 1.1102230246251565e-16,
+        "max_row_reversal_coefficient_difference": 2.220446049250313e-16,
+        "formal_oracle_failed_metrics": []
+      },
+      "reproduction_steps": [
+        "Fit the deterministic no-constant probe before and after multiplying both regressors by 1e-8.",
+        "Run the near-collinear, correlated covariance, and exact-collinearity tests in tests/test_ols.py."
+      ],
+      "disposition": "CLOSED. Column scaling plus NumPy lstsq/SVD is stable in fresh probes and detected rank deficiency is rejected explicitly."
+    },
+    {
+      "finding_id": "REG-CODE-003",
+      "severity": "HIGH",
+      "status": "CLOSED",
+      "title": "Non-finite inputs and non-finite numerical results are rejected",
+      "formula_or_invariant": "All estimator inputs and returned core estimates must be finite, or fitting must fail explicitly.",
+      "source_locations": [
+        "src/tabra/models/estimate/ols.py:45-52@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/models/estimate/ols.py:69-115@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+      ],
+      "affected_cases": ["public inputs containing Inf, overflow, or an empty complete-case sample"],
+      "evidence": {
+        "infinite_regressor": "ValueError: OLS inputs must contain only finite values",
+        "all_missing": "ValueError: OLS requires at least one complete observation",
+        "extreme_1e200_core_outputs_finite": true
+      },
+      "reproduction_steps": [
+        "Fit a frame containing Inf and an all-missing frame.",
+        "Fit y=[1,2,3,4.1] on x=[1e200,2e200,3e200,4e200] and test all core outputs for finiteness."
+      ],
+      "disposition": "CLOSED. Input, intermediate, and output finiteness guards prevent invalid results from being returned."
+    },
+    {
+      "finding_id": "REG-CODE-004",
+      "severity": "HIGH",
+      "status": "CLOSED",
+      "title": "Degenerate residual/model degrees of freedom no longer produce false inference",
+      "formula_or_invariant": "Classical covariance requires N-k>0; coefficient/F inference with zero variance or df_model<=0 is undefined and must not be represented by p=0.",
+      "source_locations": [
+        "src/tabra/models/estimate/ols.py:49-52@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/models/estimate/ols.py:117-150@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/models/estimate/stats.py:40-44@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+      ],
+      "affected_cases": ["N=k", "zero-response or exact-fit inputs", "intercept-only input"],
+      "evidence": {
+        "n_equals_k": "ValueError: OLS requires positive residual degrees of freedom: n=2, k=2",
+        "zero_response_t_p_f_nan": true,
+        "intercept_only_df_model": 0,
+        "intercept_only_f_p_nan": true
+      },
+      "reproduction_steps": [
+        "Fit a full-rank 2x2 no-constant design and confirm the residual-df error.",
+        "Run the zero-response and intercept-only tests in tests/test_ols.py."
+      ],
+      "disposition": "CLOSED. Invalid residual degrees of freedom are rejected and undefined tests are represented as NaN, not false zero probabilities."
+    },
+    {
+      "finding_id": "REG-CODE-005",
+      "severity": "MEDIUM",
+      "status": "CLOSED",
+      "title": "No-constant summary uses uncentered Total degrees of freedom and mean square",
+      "formula_or_invariant": "With c=0 and TSS=y'y, Total df=N and Total MS=TSS/N.",
+      "source_locations": [
+        "src/tabra/models/estimate/ols.py:155-162@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/results/ols_result.py:107-114@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "src/tabra/results/ols_result.py:151-152@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+      ],
+      "affected_cases": ["no_constant"],
+      "evidence": {
+        "n_obs": 5,
+        "reported_total_df": 5,
+        "reported_total_ms": 11.582,
+        "reported_line": "Total | 57.9100     5 11.582000    Root MSE      =   0.1363"
+      },
+      "reproduction_steps": [
+        "Fit the five-row no-constant summary probe.",
+        "Run TestAnovaAlignment.test_total_df_and_ms_follow_constant_convention."
+      ],
+      "disposition": "CLOSED. OLSResult retains is_con and computes Total df as N-c."
+    },
+    {
+      "finding_id": "REG-CODE-006",
+      "severity": "BLOCKER",
+      "status": "CLOSED",
+      "title": "Frozen executable oracle is bound to the current frozen inputs",
+      "formula_or_invariant": "A passing audit requires executable independent evidence bound to the exact frozen manifest, cases, data, and audited commit; the oracle hash guard must not be bypassed.",
+      "source_locations": [
+        "validation/commands/reg/oracles/code_audit_oracle.py:23-27@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "validation/commands/reg/oracles/code_audit_oracle.py:191-213@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+        "tests/test_reg_validation_oracle.py:27-86@4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd"
+      ],
+      "affected_cases": ["basic", "no_constant"],
+      "evidence": {
+        "formal_entry_status": "PASS",
+        "formal_entry_exit_code": 0,
+        "guard_bypassed": false,
+        "current_hash_checks_all_true": true,
+        "changed_manifest_exit_code": 1,
+        "changed_manifest_error": "RuntimeError: Frozen input hash mismatch"
+      },
+      "reproduction_steps": [
+        "Run the Python normalized-result runner on the frozen dataset.",
+        "Invoke the oracle formal entry with the current manifest, cases, data, and actual result; observe exit 0 and PASS.",
+        "Repeat with a manifest copy changed by one trailing newline; observe exit 1 and the frozen hash mismatch error."
+      ],
+      "disposition": "CLOSED. The current frozen hashes pass the intact guard, a changed input is rejected, and every formal comparison passes."
+    }
+  ]
+}

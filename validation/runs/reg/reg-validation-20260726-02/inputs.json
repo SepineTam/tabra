@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-02",
+  "git_commit": "4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+  "files": {
+    "manifest": {"path": "validation/commands/reg/manifest.yaml", "sha256": "3ace49ec0668c8deb699db3e6db90ade5f7e7a8105c61ff9163dd438c628068e"},
+    "cases": {"path": "validation/commands/reg/cases.yaml", "sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07"},
+    "theory": {"path": "validation/commands/reg/theory.md", "sha256": "fc99f885e2308657ba0ddb231d0496bd54aed7d7a07d038d5db08747a4e4d4b8"},
+    "formula_map": {"path": "validation/commands/reg/formula_map.csv", "sha256": "51420b1104a1db0e110fb74760cc9b992ba89c9595afd605b1d43b69d705dcf7"},
+    "dataset": {"path": "validation/commands/reg/data/reg_fixture.csv", "sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4"},
+    "independent_oracle": {"path": "validation/commands/reg/oracles/code_audit_oracle.py", "sha256": "007099d58e6a26ba4e0eb3236537d004e453b14595b3ec78a4012dfc954ea3af"}
+  }
+}

@@ -1,0 +1,13 @@
+{"at":"2026-07-26T13:27:53Z","from":null,"to":"DISCOVERED","reason":"Created the third fresh run after public-summary evidence repair."}
+{"at":"2026-07-26T13:27:53Z","from":"DISCOVERED","to":"SPEC_PENDING","reason":"Revalidated specification 2.0.2 and repaired oracle binding."}
+{"at":"2026-07-26T13:27:53Z","from":"SPEC_PENDING","to":"SPEC_READY","reason":"Preflight and 117 targeted tests passed with all frozen inputs available."}
+{"at":"2026-07-26T13:27:53Z","from":"SPEC_READY","to":"AUDIT_PENDING","reason":"Dispatched final independent code and theory audits."}
+{"at":"2026-07-26T13:47:03Z","from":"AUDIT_PENDING","to":"AUDITS_READY","reason":"Independent code and theory audits both passed with no open findings."}
+{"at":"2026-07-26T13:47:03Z","from":"AUDITS_READY","to":"ENGINE_PENDING","reason":"Started Python, Stata, and independent R execution on identical frozen inputs."}
+{"at":"2026-07-26T13:52:31Z","from":"ENGINE_PENDING","to":"ENGINES_READY","reason":"Python, Stata, and R completed every required case with normalized results."}
+{"at":"2026-07-26T13:52:31Z","from":"ENGINES_READY","to":"COMPARE_PENDING","reason":"Dispatched normalized artifacts to an independent three-engine reporter."}
+{"at":"2026-07-26T14:00:15Z","from":"COMPARE_PENDING","to":"NEEDS_REPAIR","reason":"All 17 metrics passed, but comparison was BLOCKED_ENV by missing engine-bound case, seed, sample-membership, and omitted-parameter evidence."}
+{"at":"2026-07-26T14:00:15Z","from":"NEEDS_REPAIR","to":"REPAIR_ANALYSIS","reason":"Started the third and final bounded repair analysis for runner provenance fields."}
+{"at":"2026-07-26T14:11:33Z","from":"REPAIR_ANALYSIS","to":"REPAIR_IMPLEMENTATION","reason":"Approved final schema-v2 runner provenance and fail-closed comparison repair."}
+{"at":"2026-07-26T14:27:08Z","from":"REPAIR_IMPLEMENTATION","to":"REPAIRED","reason":"Committed the third bounded repair as 47aebd1 with schema-v2 case, seed, sample-membership, and omitted-parameter provenance."}
+{"at":"2026-07-26T14:27:08Z","from":"REPAIRED","to":"RERUN_PENDING","reason":"Closed the immutable third run and scheduled one fresh verification run after all three allowed repairs."}

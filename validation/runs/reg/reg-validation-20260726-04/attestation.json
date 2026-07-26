@@ -1,0 +1,17 @@
+{
+  "command": "reg",
+  "kind": "gate_decision",
+  "manifest_sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+  "passed": false,
+  "recomputed_comparison_sha256": "2f71427d97e4fa94ecd449b6ebba5e4a749093d32bec200647a3d5a05f6f343f",
+  "run_id": "reg-validation-20260726-04",
+  "schema_version": 1,
+  "status": "failed",
+  "supplied_comparison_sha256": "125a33ffaa9261fb23e5ea3b4758af7848f40c7a77d76b513b74c90510aae181",
+  "violations": [
+    {
+      "code": "comparison_report_mismatch",
+      "message": "The stored comparison is stale or edited; regenerate it from the current manifest and normalized results"
+    }
+  ]
+}

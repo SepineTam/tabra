@@ -1,0 +1,140 @@
+{
+  "command": "reg",
+  "converged": true,
+  "engine": "r",
+  "metadata": {
+    "case_execution": [
+      {
+        "case_id": "basic",
+        "included_row_sha256": "11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76",
+        "omitted_parameters": [],
+        "seed": 20260722
+      },
+      {
+        "case_id": "no_constant",
+        "included_row_sha256": "11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76",
+        "omitted_parameters": [],
+        "seed": 20260722
+      }
+    ],
+    "case_status": [
+      "completed",
+      "completed"
+    ],
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "dataset_path": "/Users/sepinetam/Documents/Github/tabra/validation/commands/reg/data/reg_fixture.csv",
+    "engine_version": "R version 4.4.1 (2024-06-14)"
+  },
+  "metrics": {
+    "case_ids": [
+      "basic",
+      "no_constant"
+    ],
+    "coefficients": [
+      [
+        2.40695210637742,
+        -0.820063125982304,
+        1.68129015293938
+      ],
+      [
+        2.29831860556729,
+        -0.82061197759208
+      ]
+    ],
+    "df_model": [
+      2,
+      2
+    ],
+    "df_resid": [
+      117,
+      118
+    ],
+    "f_p_value": [
+      5.79049378686107e-92,
+      6.32494003415425e-25
+    ],
+    "f_stat": [
+      2063.60840381617,
+      92.7062935376451
+    ],
+    "nobs": [
+      120,
+      120
+    ],
+    "p_values": [
+      [
+        5.08928961927799e-93,
+        3.42123905586929e-38,
+        1.1031530193039e-78
+      ],
+      [
+        6.95496656312169e-26,
+        3.8410727594931e-05
+      ]
+    ],
+    "parameter_names": [
+      [
+        "x1",
+        "x2",
+        "_cons"
+      ],
+      [
+        "x1",
+        "x2"
+      ]
+    ],
+    "r_squared": [
+      0.972433076512585,
+      0.611090623703364
+    ],
+    "r_squared_adj": [
+      0.971961847051262,
+      0.604498939359353
+    ],
+    "root_mse": [
+      0.384058991353613,
+      1.73483642877253
+    ],
+    "ss_model": [
+      608.769880990377,
+      558.028371158866
+    ],
+    "ss_residual": [
+      17.2576531342279,
+      355.139577282354
+    ],
+    "ss_total": [
+      626.027534124605,
+      913.16794844122
+    ],
+    "standard_errors": [
+      [
+        0.0375200330810996,
+        0.0424577073591154,
+        0.035128380400108
+      ],
+      [
+        0.169171687669379,
+        0.191786096355907
+      ]
+    ],
+    "test_statistics": [
+      [
+        64.151118981553,
+        -19.3148235500813,
+        47.8613056961262
+      ],
+      [
+        13.5857166008712,
+        -4.27878763468459
+      ]
+    ]
+  },
+  "sample": {
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "nobs": 120
+  },
+  "schema_version": 2,
+  "skipped": false,
+  "status": "completed"
+}

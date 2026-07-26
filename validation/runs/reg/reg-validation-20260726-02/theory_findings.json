@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-02",
+  "audit_date": "2026-07-26",
+  "theory_audit_status": "FAIL",
+  "audited_commit": "4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+  "gate_decision_issued": false,
+  "blocked_environment": false,
+  "frozen_inputs": {
+    "commit": "4caa15acacb770c5ee95b0fe6ffdea08fd1d20bd",
+    "manifest_sha256": "3ace49ec0668c8deb699db3e6db90ade5f7e7a8105c61ff9163dd438c628068e",
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "theory_sha256": "fc99f885e2308657ba0ddb231d0496bd54aed7d7a07d038d5db08747a4e4d4b8",
+    "formula_map_sha256": "51420b1104a1db0e110fb74760cc9b992ba89c9595afd605b1d43b69d705dcf7",
+    "independent_oracle_sha256": "007099d58e6a26ba4e0eb3236537d004e453b14595b3ec78a4012dfc954ea3af",
+    "tracked_worktree_clean": true
+  },
+  "formula_map_summary": {
+    "row_count": 20,
+    "implemented": 19,
+    "blocked_unsupported": 1,
+    "supported_normalized_metric_coverage": true,
+    "complete_public_report_coverage": false,
+    "complete_release_critical_coverage": false
+  },
+  "authoritative_sources": [
+    {
+      "citation": "Lai, T. L. and Xing, H. (2008), Statistical Models and Methods for Financial Markets, Springer Texts in Statistics.",
+      "doi": "https://doi.org/10.1007/978-0-387-77827-3",
+      "locations": [
+        "p. 4 eq. (1.2)",
+        "p. 5 eqs. (1.4)-(1.5) and RSS definition",
+        "p. 7 eqs. (1.9)-(1.10)",
+        "pp. 8-10 eqs. (1.11)-(1.14) and (1.22)",
+        "pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1",
+        "pp. 13-14 eqs. (1.27)-(1.28)"
+      ],
+      "role": "primary mathematical and inferential support"
+    },
+    {
+      "citation": "Fisher, R. A. (1922), The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients, Journal of the Royal Statistical Society 85(4):597-612.",
+      "doi": "https://doi.org/10.2307/2341124",
+      "scan": "http://hdl.handle.net/2440/15174",
+      "locations": [
+        "journal pp. 607-610, section 6"
+      ],
+      "role": "original finite-sample regression-coefficient distribution support; not modern matrix notation"
+    },
+    {
+      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress.",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "locations": [
+        "p. 7",
+        "pp. 8-10",
+        "p. 15",
+        "p. 22 eq. (2)",
+        "p. 23 eq. (3)",
+        "p. 26"
+      ],
+      "role": "official software-compatibility and reporting-parameterization documentation; not mathematical proof"
+    }
+  ],
+  "verified_checks": [
+    {
+      "check_id": "VC-REG-02-001",
+      "subject": "Lai and Xing exact locations",
+      "status": "verified",
+      "evidence": "Printed pp. 4-14 and the cited equations were independently checked against the source."
+    },
+    {
+      "check_id": "VC-REG-02-002",
+      "subject": "Fisher section 6",
+      "status": "verified",
+      "evidence": "Journal pp. 607-610 were independently checked from the institutional scan, including n-2 for simple regression and the p+1-constant extension."
+    },
+    {
+      "check_id": "VC-REG-02-003",
+      "subject": "Stata 19 compatibility role",
+      "status": "verified",
+      "evidence": "The manual supports missing-value, constant/no-constant, ANOVA, VCE, t/F-tail, and df conventions and was not treated as implementation proof."
+    },
+    {
+      "check_id": "VC-REG-02-004",
+      "subject": "partial-missing mapping",
+      "status": "verified",
+      "source_location": "Stata 19 [R] regress p. 15",
+      "code_locations": [
+        "src/tabra/models/estimate/base.py:19-23",
+        "src/tabra/models/estimate/ols.py:36"
+      ],
+      "test_id": "tests/test_ols.py::test_partial_missing_rows_use_joint_complete_case_sample",
+      "test_result": "PASS",
+      "limitation": "Frozen three-engine cases contain no missing values, and the test does not establish an ignorable missingness mechanism."
+    },
+    {
+      "check_id": "VC-REG-02-005",
+      "subject": "independent normalized formula oracle",
+      "status": "verified",
+      "result": "PASS",
+      "cases": [
+        "basic",
+        "no_constant"
+      ],
+      "limitation": "Executable agreement is implementation evidence, not mathematical proof."
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "TA-REG-02-001",
+      "severity": "critical",
+      "category": "unmapped_reported_quantity",
+      "status": "open",
+      "affected_output": "coefficient_95_percent_confidence_interval",
+      "formula_ids": [],
+      "authoritative_support_available": [
+        "Lai and Xing (2008), p. 8, eq. (1.15)",
+        "Stata 19 [R] regress, p. 26 for N-k t reference degrees of freedom"
+      ],
+      "code_locations": [
+        "src/tabra/results/ols_result.py:155-166"
+      ],
+      "evidence": [
+        "OLSResult.summary() publicly labels and reports [95% Conf. Interval].",
+        "The implementation uses stats.t.ppf(0.975, df_resid) and coefficient plus or minus t critical times standard error.",
+        "No frozen formula_map.csv row defines or maps this quantity.",
+        "No independent numerical confidence-interval test was found."
+      ],
+      "consequence": "A publicly reported release-critical statistical formula lacks the required primary-source, assumption, parameterization, code, and test mapping; theory audit cannot pass.",
+      "required_action": "Add a frozen confidence-interval formula row with exact source location, N-k and two-sided 95% parameterization, normal-error limitation, OLSResult code location, and an independent numerical test for both supported constant conventions."
+    },
+    {
+      "finding_id": "TA-REG-02-002",
+      "severity": "high",
+      "category": "incomplete_code_test_mapping",
+      "status": "open",
+      "formula_ids": [
+        "REG-NOCONSTANT-001"
+      ],
+      "affected_output": "public_summary_total_df_and_total_ms",
+      "authoritative_rule": "For c=0, total df=N and total MS=TSS/N; Stata 19 [R] regress pp. 9-10 and 22-23.",
+      "code_locations": [
+        "src/tabra/results/ols_result.py:107-152"
+      ],
+      "existing_test_id": "tests/test_ols_result.py::TestAnovaAlignment::test_total_df_and_ms_follow_constant_convention",
+      "existing_test_result": "PASS",
+      "evidence": "REG-NOCONSTANT-001 maps OLSResult._summary_style_stata but omits the existing test that directly verifies the public Total row; its listed oracle and tests cover normalized fit statistics instead.",
+      "consequence": "The frozen formula row does not provide the complete recorded implementation-to-independent-test trace required by the audit skill.",
+      "required_action": "Add the exact public-summary test ID to REG-NOCONSTANT-001 or a dedicated formula row in a newly frozen formula map."
+    }
+  ],
+  "execution_evidence": {
+    "targeted_tests": {
+      "environment": ".venv/bin/python",
+      "result": "8 passed",
+      "includes": [
+        "tests/test_ols.py::test_partial_missing_rows_use_joint_complete_case_sample",
+        "tests/test_ols_result.py::TestAnovaAlignment::test_total_df_and_ms_follow_constant_convention"
+      ]
+    },
+    "independent_oracle": {
+      "oracle_status": "PASS",
+      "imports_tabra": false,
+      "hash_checks_passed": true,
+      "all_metric_comparisons_passed": true
+    }
+  },
+  "decision_reasons": [
+    "The publicly reported coefficient confidence interval has no frozen formula-map row and no independent numerical test.",
+    "REG-NOCONSTANT-001 omits the exact test ID for the public summary code it claims to map.",
+    "Primary papers, official documentation, source files, and tests were accessible, so BLOCKED_ENV does not apply.",
+    "Passing oracle and targeted tests do not override unmapped release-critical formulas."
+  ]
+}
