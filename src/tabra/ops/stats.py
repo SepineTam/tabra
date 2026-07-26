@@ -47,7 +47,7 @@ def t_pval(t, df):
     Returns:
         Two-tailed p-value
     """
-    return float(2 * (1 - sp_stats.t.cdf(abs(t), df)))
+    return float(2 * sp_stats.t.sf(abs(t), df))
 
 
 def f_pval(f, df1, df2):
@@ -61,4 +61,4 @@ def f_pval(f, df1, df2):
     Returns:
         Right-tailed p-value
     """
-    return float(1 - sp_stats.f.cdf(f, df1, df2))
+    return float(sp_stats.f.sf(f, df1, df2))

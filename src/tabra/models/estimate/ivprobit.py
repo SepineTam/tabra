@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : ivprobit.py
 
+# Scientific support: EST-IVPROBIT in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from scipy import stats as sp_stats
 from scipy.optimize import minimize

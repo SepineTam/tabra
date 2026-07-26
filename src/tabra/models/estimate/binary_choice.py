@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : binary_choice.py
 
+# Scientific support: EST-PROBIT and EST-LOGIT in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from abc import abstractmethod
 from scipy import stats as sp_stats

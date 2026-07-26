@@ -7,7 +7,6 @@
 # @Email  : sepinetam@gmail.com
 # @File   : __init__.py
 
-import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -42,8 +41,17 @@ class TabraFigure:
             TabraFigure: Returns self for method chaining.
         """
         paths = self._resolve_paths(filename, formats)
+        auto_create = True
+        if self._tabra is not None:
+            auto_create = self._tabra._config.auto_create_missing_dir
         for p in paths:
-            os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+            parent = Path(p).parent
+            if auto_create:
+                parent.mkdir(parents=True, exist_ok=True)
+            elif not parent.exists():
+                raise FileNotFoundError(
+                    f"Figure save directory does not exist: {parent}"
+                )
             self._fig.savefig(p, dpi=dpi, bbox_inches="tight", **kwargs)
         return self
 
@@ -574,6 +582,23 @@ class PlotOps:
             raise ValueError("layers must not be empty")
 
         kinds = [next(iter(d)) for d in layers]
+        supported_kinds = {
+            PlotKind.scatter,
+            PlotKind.line,
+            PlotKind.bar,
+            PlotKind.hist,
+            PlotKind.pie,
+            PlotKind.lfit,
+            PlotKind.lfitci,
+        }
+        unsupported_kinds = [kind for kind in kinds if kind not in supported_kinds]
+        if unsupported_kinds:
+            names = ", ".join(
+                kind.value if isinstance(kind, PlotKind) else str(kind)
+                for kind in unsupported_kinds
+            )
+            raise ValueError(f"Plot kind(s) {names} are not supported by mix")
+
         has_pie = any(k == PlotKind.pie for k in kinds)
         if has_pie and len(layers) > 1:
             raise ValueError("pie cannot be mixed with other plot types")
@@ -960,5 +985,6 @@ def set_save_base(base_dir):
         >>> from tabra.plot import set_save_base
         >>> set_save_base("tmp/figs")
     """
-    global _global_figure_save_base
-    _global_figure_save_base = str(base_dir)
+    from tabra.core.config import set_figure_save_base
+
+    set_figure_save_base(base_dir)

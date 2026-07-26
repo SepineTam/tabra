@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-audit-20260723-01",
+  "code_audit_status": "FAIL",
+  "audited_commit": "0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+  "worktree_dirty": true,
+  "frozen_inputs": {
+    "manifest_sha256": "533e96bde7c0fd15dcc532f127789ab300c21f378c7b344ac99be6a4cafa26d7",
+    "cases_sha256": "d6dc76648bcd0433795b60c2f65d46cc89167565384c23e24d864525d42ea7e7",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4"
+  },
+  "oracle": {
+    "path": "validation/commands/reg/oracles/code_audit_oracle.py",
+    "sha256": "527b609e22a95163b99149c271e448774de76bd19702de7bbb79fcb4118a39ce",
+    "imports_tabra": false,
+    "frozen_commit_status": "FAIL",
+    "dirty_worktree_status": "PASS"
+  },
+  "summary": {
+    "critical": 1,
+    "high": 3,
+    "medium": 1,
+    "open": 5
+  },
+  "findings": [
+    {
+      "finding_id": "REG-CODE-001",
+      "severity": "CRITICAL",
+      "status": "OPEN",
+      "title": "Frozen t and F tail probabilities collapse to exact zero",
+      "formula_or_invariant": "Two-sided p=2*P(T_df>=abs(t)) and right-tail p=P(F>=f); manifest reject_zero_mismatch requires representable nonzero tails not to become zero.",
+      "source_locations": [
+        "src/tabra/ops/stats.py:50@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/ops/stats.py:64@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/models/estimate/ols.py:56@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/models/estimate/stats.py:44@0242978e7add4a7d44ab2056c4cbc9657f24a5f9"
+      ],
+      "affected_cases": ["basic", "no_constant"],
+      "evidence": {
+        "failed_metrics": ["p_values", "f_p_value"],
+        "basic_actual_p_values": [0.0, 0.0, 0.0],
+        "basic_oracle_p_values": [5.089289619277773e-93, 3.421239055869278e-38, 1.103153019303927e-78],
+        "no_constant_x1_actual_p_value": 0.0,
+        "no_constant_x1_oracle_p_value": 6.954966563121642e-26,
+        "actual_f_p_values": [0.0, 0.0],
+        "oracle_f_p_values": [5.790493786860803e-92, 6.324940034154269e-25],
+        "zero_mismatch": true
+      },
+      "reproduction_steps": [
+        "Export commit 0242978e7add4a7d44ab2056c4cbc9657f24a5f9 src/tabra into a temporary directory with git archive.",
+        "Run validation/commands/reg/python/run.py with PYTHONPATH pointing to the exported src tree and the frozen fixture.",
+        "Run validation/commands/reg/oracles/code_audit_oracle.py against that result; observe exit 1 and zero_mismatch=true for both p-value metrics."
+      ],
+      "disposition": "OPEN. The dirty worktree survival-function edit is not part of the frozen commit; freeze a repaired revision and rerun the full code audit."
+    },
+    {
+      "finding_id": "REG-CODE-002",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "title": "Normal-equations LU solve is scale-dependent and lacks rank/conditioning safeguards",
+      "formula_or_invariant": "For nonzero scalar c, uniformly replacing X by cX preserves rank and cond(X), and fitted values from OLS must be invariant after reciprocal coefficient scaling.",
+      "source_locations": [
+        "src/tabra/models/estimate/ols.py:44-50@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/ops/linalg.py:57-97@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/ops/linalg.py:136-158@0242978e7add4a7d44ab2056c4cbc9657f24a5f9"
+      ],
+      "affected_cases": ["basic", "no_constant", "any full-rank design with small units or near-collinearity"],
+      "evidence": {
+        "uniform_scale": 1e-08,
+        "unscaled_rank": 2,
+        "scaled_rank": 2,
+        "unscaled_condition_x": 1.1760999150110116,
+        "scaled_condition_x": 1.176099915011012,
+        "unscaled_outcome": "returned",
+        "scaled_outcome": "ValueError: Matrix is singular, cannot perform LU decomposition",
+        "near_collinear_condition_x": 8224350.111966385,
+        "near_collinear_max_abs_beta_error_vs_svd": 3.214380857019478,
+        "near_collinear_max_abs_fitted_error_vs_svd": 0.00608548828131561
+      },
+      "reproduction_steps": [
+        "Create a no-constant two-column full-rank design from linspace(-1,1,30) and sin(arange(30)).",
+        "Fit once at original units and once after multiplying both X columns by 1e-8.",
+        "Verify both matrices have rank 2 and cond(X)=1.1761; observe the scaled fit raises the LU singularity ValueError."
+      ],
+      "disposition": "OPEN. Use a rank-revealing numerically stable solve with scale-relative rank/condition policy and explicit diagnostics; then rerun the audit."
+    },
+    {
+      "finding_id": "REG-CODE-003",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "title": "Non-finite and overflow inputs can return invalid estimates",
+      "formula_or_invariant": "Estimator inputs and all returned coefficients, covariance entries, statistics, and probabilities must be finite or estimation must fail explicitly.",
+      "source_locations": [
+        "src/tabra/models/estimate/base.py:19-23@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/models/estimate/ols.py:35-73@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/ops/linalg.py:78-95@0242978e7add4a7d44ab2056c4cbc9657f24a5f9"
+      ],
+      "affected_cases": ["basic", "no_constant", "public reg inputs containing Inf or overflowing products"],
+      "evidence": {
+        "infinity_probe": "returned NaN coefficients, standard errors, t statistics, p-values, F statistic, and F p-value",
+        "overflow_probe": "returned coefficient [0.0, 2.5], NaN slope p-value, F=0.0, and F p=1.0"
+      },
+      "reproduction_steps": [
+        "Fit y=[1,2,3,4] on x=[0,1,Inf,3] with a constant and inspect result arrays.",
+        "Fit the same y on x=[1e200,2e200,3e200,4e200] and inspect warnings and result finiteness."
+      ],
+      "disposition": "OPEN. Validate finite inputs and finite intermediate/output arrays, raising a specific estimation error before returning a result."
+    },
+    {
+      "finding_id": "REG-CODE-004",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "title": "Degenerate degrees of freedom and zero variance produce false or undefined inference",
+      "formula_or_invariant": "Classical covariance requires df_resid=n-k>0; an F test requires df_model>0 and positive residual variance. Undefined tests must not be reported with p=0.",
+      "source_locations": [
+        "src/tabra/models/estimate/ols.py:52-58@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/models/estimate/stats.py:22-27@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/models/estimate/stats.py:40-44@0242978e7add4a7d44ab2056c4cbc9657f24a5f9"
+      ],
+      "affected_cases": ["intercept-only", "n=k", "zero-response or exact-fit inputs"],
+      "evidence": {
+        "n_equals_k": "ZeroDivisionError: float division by zero",
+        "zero_response": "returned zero standard errors, NaN t/p values, F=0.0, and F p=0.0",
+        "intercept_only": "returned df_model=0, F=0.0, and F p=0.0"
+      },
+      "reproduction_steps": [
+        "Fit a full-rank 2x2 no-constant design and observe division by zero at RSS/(n-k).",
+        "Fit a zero response on a varying regressor with a constant and inspect NaN coefficient tests plus F p=0.",
+        "Fit a nonconstant response with x=[] and a constant and observe df_model=0 but F p=0."
+      ],
+      "disposition": "OPEN. Validate degrees of freedom and variance before inference and represent undefined tests explicitly rather than as a zero p-value."
+    },
+    {
+      "finding_id": "REG-CODE-005",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "title": "No-constant summary reports the wrong Total degrees of freedom and mean square",
+      "formula_or_invariant": "With uncentered TSS=sum(y^2), Total df is n, and Total MS is TSS/n.",
+      "source_locations": [
+        "src/tabra/results/ols_result.py:113@0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+        "src/tabra/results/ols_result.py:150@0242978e7add4a7d44ab2056c4cbc9657f24a5f9"
+      ],
+      "affected_cases": ["no_constant"],
+      "evidence": {
+        "n_obs": 120,
+        "reported_total_df": 119,
+        "required_uncentered_total_df": 120,
+        "reported_line": "Total | 913.1679   119   7.673680"
+      },
+      "reproduction_steps": [
+        "Fit the frozen no_constant case.",
+        "Call result.summary() and inspect the Total row; compare its df and MS denominator with n_obs."
+      ],
+      "disposition": "OPEN. Carry the constant convention into summary Total df/MS formatting and add a no-constant summary assertion."
+    }
+  ]
+}

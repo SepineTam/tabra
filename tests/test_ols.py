@@ -202,3 +202,156 @@ def test_no_constant_regression(ols_data_no_constant):
     assert np.allclose(result.r_squared, r2, atol=1e-10)
     assert np.allclose(result.r_squared_adj, r2_adj, atol=1e-10)
     assert np.allclose(result.f_stat, f_stat, atol=1e-8)
+
+
+def test_full_rank_fit_is_invariant_to_uniform_scaling():
+    from tabra.models.estimate.ols import OLS
+
+    index = np.arange(30, dtype=float)
+    x1 = np.linspace(-1.0, 1.0, 30)
+    x2 = np.sin(index)
+    y = 1.7 * x1 - 0.4 * x2 + np.cos(index) * 0.01
+    data = pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+    scaled_data = data.assign(x1=x1 * 1e-8, x2=x2 * 1e-8)
+
+    result = OLS().fit(data, y="y", x=["x1", "x2"], is_con=False)
+    scaled_result = OLS().fit(
+        scaled_data, y="y", x=["x1", "x2"], is_con=False
+    )
+
+    assert np.allclose(scaled_result.coef * 1e-8, result.coef, rtol=1e-10)
+    assert np.allclose(scaled_result.fitted, result.fitted, atol=1e-12)
+
+
+def test_near_collinear_fit_matches_lstsq():
+    from tabra.models.estimate.ols import OLS
+
+    x1 = np.linspace(-1.0, 1.0, 80)
+    x2 = x1 + 1e-7 * np.sin(np.arange(80, dtype=float))
+    design = np.column_stack([x1, x2, np.ones(80)])
+    y = design @ np.array([2.0, -0.5, 1.0]) + 1e-8 * np.cos(np.arange(80))
+    data = pd.DataFrame({"y": y, "x1": x1, "x2": x2})
+    expected_coef = np.linalg.lstsq(design, y, rcond=None)[0]
+    expected_resid = y - design @ expected_coef
+    expected_sigma2 = expected_resid @ expected_resid / (len(y) - design.shape[1])
+    _, singular_values, right_singular_vectors = np.linalg.svd(
+        design, full_matrices=False
+    )
+    covariance_factor = right_singular_vectors.T / singular_values
+    expected_std_err = np.sqrt(
+        expected_sigma2 * np.sum(covariance_factor ** 2, axis=1)
+    )
+
+    assert 1e6 < np.linalg.cond(design) < 1e9
+    result = OLS().fit(data, y="y", x=["x1", "x2"], is_con=True)
+
+    assert np.allclose(result.coef, expected_coef, rtol=1e-8, atol=1e-8)
+    assert np.allclose(result.fitted, design @ expected_coef, atol=1e-10)
+    assert np.allclose(result.std_err, expected_std_err, rtol=1e-7, atol=1e-9)
+    assert np.isfinite(result.std_err).all()
+    assert (result.std_err > 0).all()
+
+
+def test_correlated_standard_errors_match_xtx_inverse():
+    from tabra.models.estimate.ols import OLS
+
+    design = np.array(
+        [[1.0, 1.0], [2.0, 3.0], [3.0, 5.0], [4.0, 7.0]]
+    )
+    y = np.array([1.0, 2.0, 3.0, 5.0])
+    data = pd.DataFrame({"y": y, "x1": design[:, 0], "x2": design[:, 1]})
+    expected_coef = np.linalg.solve(design.T @ design, design.T @ y)
+    expected_resid = y - design @ expected_coef
+    expected_sigma2 = expected_resid @ expected_resid / (len(y) - design.shape[1])
+    expected_std_err = np.sqrt(
+        expected_sigma2 * np.diag(np.linalg.inv(design.T @ design))
+    )
+
+    result = OLS().fit(data, y="y", x=["x1", "x2"], is_con=False)
+
+    assert np.allclose(result.std_err, expected_std_err, rtol=1e-12, atol=1e-12)
+
+
+def test_rank_deficient_design_raises_clear_error():
+    from tabra.models.estimate.ols import OLS
+
+    x1 = np.arange(1.0, 8.0)
+    data = pd.DataFrame({"y": x1 + 1.0, "x1": x1, "x2": 2.0 * x1})
+
+    with pytest.raises(ValueError, match=r"rank deficient: rank=\d+, k=3"):
+        OLS().fit(data, y="y", x=["x1", "x2"], is_con=True)
+
+
+def test_infinite_regressor_is_rejected():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame({"y": [1.0, 2.0, 3.0, 4.0], "x": [0.0, 1.0, np.inf, 3.0]})
+
+    with pytest.raises(ValueError, match="finite values"):
+        OLS().fit(data, y="y", x=["x"], is_con=True)
+
+
+def test_extreme_scale_never_returns_nonfinite_result():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame(
+        {"y": [1.0, 2.0, 3.0, 4.1], "x": [1e200, 2e200, 3e200, 4e200]}
+    )
+
+    result = OLS().fit(data, y="y", x=["x"], is_con=True)
+
+    arrays = (
+        result.coef,
+        result.std_err,
+        result.t_stat,
+        result.p_value,
+        result.resid,
+        result.fitted,
+    )
+    scalars = (result.r_squared, result.f_stat, result.f_pval)
+    assert all(np.isfinite(values).all() for values in arrays)
+    assert np.isfinite(scalars).all()
+
+
+def test_all_missing_sample_is_rejected():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame({"y": [np.nan, np.nan], "x": [np.nan, np.nan]})
+
+    with pytest.raises(ValueError, match="complete observation"):
+        OLS().fit(data, y="y", x=["x"], is_con=True)
+
+
+def test_n_equals_k_is_rejected():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame({"y": [1.0, 2.0], "x1": [1.0, 0.0], "x2": [0.0, 1.0]})
+
+    with pytest.raises(ValueError, match="positive residual degrees of freedom"):
+        OLS().fit(data, y="y", x=["x1", "x2"], is_con=False)
+
+
+def test_zero_response_marks_inference_as_undefined():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame({"y": np.zeros(10), "x": np.arange(10, dtype=float)})
+
+    result = OLS().fit(data, y="y", x=["x"], is_con=True)
+
+    assert np.isnan(result.t_stat).all()
+    assert np.isnan(result.p_value).all()
+    assert np.isnan(result.f_stat)
+    assert np.isnan(result.f_pval)
+
+
+def test_intercept_only_model_marks_f_test_as_undefined():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame({"y": [1.0, 2.0, 4.0, 8.0]})
+
+    result = OLS().fit(data, y="y", x=[], is_con=True)
+
+    assert result.coef[0] == pytest.approx(data["y"].mean())
+    assert result._df_model == 0
+    assert np.isnan(result.f_stat)
+    assert np.isnan(result.f_pval)

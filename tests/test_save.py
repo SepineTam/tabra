@@ -1,12 +1,11 @@
 import os
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from tabra import load_data
 from tests.auto_data import load_auto_df
-from tabra.plot import TabraFigure
+from tabra.plot import set_save_base
 
 
 @pytest.fixture
@@ -58,6 +57,9 @@ class TestSaveFormats:
 
 
 class TestSaveBase:
+    def test_default_save_base_remains_current_directory(self, tab):
+        assert tab.config.figure_save_base == Path.cwd()
+
     def test_relative_path_uses_save_base(self, tab, tmp_path):
         """Relative path + save_base → prepend save_base."""
         tab.config.set_figure_save_base(tmp_path)
@@ -80,5 +82,31 @@ class TestSaveBase:
         fig = tab.plot.scatter("price", "weight")
         # just check it doesn't crash with relative path
         result = fig.save("tmp/test_no_base.png")
+        assert result is fig
         assert os.path.exists("tmp/test_no_base.png")
+        fig.close()
+
+    def test_global_save_base_is_used(self, tab, tmp_path, monkeypatch):
+        import tabra.core.config as config_module
+
+        monkeypatch.setattr(config_module, "_global_figure_save_base", None)
+        set_save_base(tmp_path)
+        fig = tab.plot.scatter("price", "weight")
+
+        fig.save("global.png")
+
+        assert (tmp_path / "global.png").exists()
+        fig.close()
+
+
+class TestSaveDirectoryCreation:
+    def test_disabled_auto_create_missing_dir_is_respected(self, tab, tmp_path):
+        nested_path = tmp_path / "missing" / "figure.png"
+        tab.config.set_auto_create_missing_dir(False)
+        fig = tab.plot.scatter("price", "weight")
+
+        with pytest.raises(FileNotFoundError):
+            fig.save(nested_path)
+
+        assert not nested_path.parent.exists()
         fig.close()

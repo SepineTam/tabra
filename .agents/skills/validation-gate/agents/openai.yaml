@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validation Gate"
+  short_description: "Issue an independent pass, fail, or blocked validation decision"
+  default_prompt: "Independently evaluate this validation run and issue its attestation."

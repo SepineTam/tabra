@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify All Commands"
+  short_description: "Orchestrate strict autonomous three-layer validation"
+  default_prompt: "Autonomously validate commands through specification, audits, three-engine comparison, and gate review."

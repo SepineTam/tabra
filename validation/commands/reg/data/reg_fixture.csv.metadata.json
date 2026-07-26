@@ -1,0 +1,10 @@
+{
+  "csv_float_format": ".17g",
+  "finite_values": true,
+  "generator": "validation/commands/reg/data/generate.py",
+  "normal_transform": "Box-Muller v1",
+  "random_generator": "random.Random.random (Mersenne Twister)",
+  "rows": 120,
+  "seed": 20260722,
+  "sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4"
+}

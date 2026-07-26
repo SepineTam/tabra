@@ -548,11 +548,10 @@ class DataOps:
         if cmd == "report":
             n_total = len(df)
             n_unique = (~dup_mask).sum()
-            n_dup_groups = dup_mask.sum() - has_dup.sum()  # unique groups that have dups
             grouped = df.groupby(check_cols).size()
             groups_with_dups = (grouped > 1).sum()
             n_excess = has_dup.sum()
-            print(f"Duplicates report")
+            print("Duplicates report")
             print(f"  Observations:     {n_total}")
             print(f"  Unique obs:       {n_unique}")
             print(f"  Duplicate groups: {groups_with_dups}")
@@ -1107,7 +1106,6 @@ class DataOps:
             >>> dta.data.describe("price mpg rep78")
             >>> dta.data.describe("^r")
         """
-        import re
         df = self._tabra._df
         if vars is not None:
             vars_list = self._resolve_vars(vars)
@@ -1210,6 +1208,7 @@ class DataOps:
             print(result.to_string(index=False))
             print(f"{'─' * 40}")
             print(f"{'Total':>{len(var)}} | {total:>5}   100.00")
+            return self
         else:
             # --- two-way crosstab ---
             from tabra.results.crosstab_result import CrosstabResult

@@ -30,6 +30,11 @@ jobs:
     - name: Run full test suite
       run: uv run --python 3.11 pytest -q
 
+    - name: Validate scientific registry structure
+      run: >-
+        uv run --python 3.11 tabra-validate preflight
+        --registry validation/registry.yaml
+
     - name: Build package
       run: uv build
 

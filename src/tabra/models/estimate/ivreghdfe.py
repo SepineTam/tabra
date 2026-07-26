@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : ivreghdfe.py
 
+# Scientific support: EST-IVHDFE in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from scipy import stats as sp_stats
 from tabra.models.estimate.base import BaseModel

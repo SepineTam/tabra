@@ -38,8 +38,8 @@ class EstimationStats:
 
     @staticmethod
     def f_statistics(sse, ssr, df_model, df_resid):
-        if df_model <= 0 or df_resid <= 0 or ssr <= 0:
-            return 0.0, 0.0
+        if df_model <= 0 or df_resid <= 0 or ssr <= 0 or sse < 0:
+            return np.nan, np.nan
         f_stat = (sse / df_model) / (ssr / df_resid)
         return f_stat, f_pval(f_stat, df_model, df_resid)
 

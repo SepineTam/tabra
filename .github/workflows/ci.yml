@@ -29,3 +29,15 @@ jobs:
 
       - name: Run tests
         run: uv run --python ${{ matrix.python-version }} pytest -q
+
+      - name: Validate scientific registry structure
+        run: >-
+          uv run --python ${{ matrix.python-version }} tabra-validate preflight
+          --registry validation/registry.yaml
+
+      - name: Run Python scientific-validation leg
+        run: >-
+          uv run --python ${{ matrix.python-version }} python
+          validation/commands/reg/python/run.py
+          --data validation/commands/reg/data/reg_fixture.csv
+          --output ${{ runner.temp }}/reg-python-result.json

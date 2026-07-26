@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : mlogit.py
 
+# Scientific support: EST-MLOGIT in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from scipy import stats as sp_stats
 from scipy.optimize import minimize

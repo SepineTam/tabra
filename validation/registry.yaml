@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "commands": {
+    "reg": {
+      "manifest": "commands/reg/manifest.yaml",
+      "enabled": true,
+      "priority": 10,
+      "stage": "pilot",
+      "latest_attestation": null
+    }
+  }
+}

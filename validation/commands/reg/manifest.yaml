@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "public_api": "TabraData.est.reg(y, x, is_con=True)",
+  "implementation": "src/tabra/models/estimate/ols.py::OLS.fit",
+  "stage": "pilot",
+  "engines": ["python", "stata", "r"],
+  "tolerances_frozen": true,
+  "engine_runners": {
+    "python": "python/run.py",
+    "stata": "stata/run.py",
+    "r": "r/run.py"
+  },
+  "environment_requirements": {
+    "python": {"minimum_version": "3.11"},
+    "stata": {"minimum_version": "16"},
+    "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"}
+  },
+  "supported_cases": ["basic", "no_constant"],
+  "unsupported_options": [
+    {
+      "option": "robust",
+      "tabra_status": "not_implemented",
+      "policy": "must_not_be_marked_passed",
+      "reason": "Tabra reg currently exposes only is_con and computes the homoskedastic OLS covariance."
+    }
+  ],
+  "metrics": {
+    "case_ids": {"tolerance": {"exact": true}},
+    "nobs": {"tolerance": {"exact": true}},
+    "df_model": {"tolerance": {"exact": true}},
+    "df_resid": {"tolerance": {"exact": true}},
+    "parameter_names": {"tolerance": {"exact": true}},
+    "coefficients": {"tolerance": {"atol": 1e-10, "rtol": 1e-9}},
+    "standard_errors": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}},
+    "test_statistics": {"tolerance": {"atol": 1e-9, "rtol": 1e-8}},
+    "p_values": {
+      "tolerance": {"atol": 1e-10, "rtol": 1e-8},
+      "safety": {"reject_zero_mismatch": true}
+    },
+    "r_squared": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}},
+    "r_squared_adj": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}},
+    "f_stat": {"tolerance": {"atol": 1e-9, "rtol": 1e-8}},
+    "f_p_value": {
+      "tolerance": {"atol": 1e-10, "rtol": 1e-8},
+      "safety": {"reject_zero_mismatch": true}
+    },
+    "ss_residual": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}},
+    "ss_model": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}},
+    "ss_total": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}},
+    "root_mse": {"tolerance": {"atol": 1e-10, "rtol": 1e-8}}
+  },
+  "comparison_policy": [
+    "Tolerances are frozen before execution.",
+    "A missing required engine is BLOCKED_ENV, never a skip or pass.",
+    "A dataset SHA-256 mismatch is a validation failure.",
+    "Engine agreement does not override a contradiction with the independent formula oracle."
+  ],
+  "data": {
+    "generator": "data/generate.py",
+    "seed": 20260722,
+    "rows": 120,
+    "columns": ["row_id", "y", "x1", "x2"],
+    "sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4"
+  },
+  "theory": "theory.md",
+  "formula_map": "formula_map.csv",
+  "normalized_result_schema": "../../schema/normalized-result.schema.json"
+}

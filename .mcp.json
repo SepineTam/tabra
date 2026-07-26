@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "stata-mcp": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/uvx",
+      "args": [
+        "stata-mcp"
+      ],
+      "env": {}
+    }
+  }
+}

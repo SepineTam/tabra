@@ -127,6 +127,38 @@ class TestAnovaAlignment:
             f"| not aligned at columns: {pipe_cols}"
         )
 
+    def test_total_df_and_ms_follow_constant_convention(self):
+        from tabra.models.estimate.ols import OLS
+
+        data = pd.DataFrame(
+            {
+                "y": [1.2, 2.1, 2.9, 4.2, 5.1],
+                "x": [1.0, 2.0, 3.0, 4.0, 5.0],
+            }
+        )
+        with_constant = OLS().fit(data, y="y", x=["x"], is_con=True)
+        without_constant = OLS().fit(data, y="y", x=["x"], is_con=False)
+
+        def total_values(result):
+            total_line = next(
+                line for line in result.summary().splitlines()
+                if line.lstrip().startswith("Total")
+            )
+            total_fields = total_line.split("|")[1].split()
+            return int(total_fields[1]), float(total_fields[2])
+
+        constant_df, constant_ms = total_values(with_constant)
+        no_constant_df, no_constant_ms = total_values(without_constant)
+
+        assert constant_df == len(data) - 1
+        assert no_constant_df == len(data)
+        assert constant_ms == pytest.approx(
+            with_constant.SST / (len(data) - 1), abs=5e-7
+        )
+        assert no_constant_ms == pytest.approx(
+            without_constant.SST / len(data), abs=5e-7
+        )
+
 
 class TestAnovaNoLeadingSpaces:
     def test_source_line_no_extra_leading_spaces(self, ols_result):
@@ -192,7 +224,10 @@ class TestConsOrdering:
 
     def test_cons_is_last_line_in_summary(self, ols_result):
         summary = ols_result.summary()
-        lines = [l for l in summary.split("\n") if l.strip() and not l.startswith("-")]
+        lines = [
+            line for line in summary.split("\n")
+            if line.strip() and not line.startswith("-")
+        ]
         coef_lines = []
         in_coef = False
         for line in lines:
