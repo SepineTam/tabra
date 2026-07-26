@@ -30,9 +30,12 @@ c=\begin{cases}
 
 Here $k$ counts every fitted coefficient, including the constant when
 $c=1$. Thus `df_model` is $k-c$, `df_resid` is $N-k$, and total ANOVA
-degrees of freedom are $N-c$. These definitions and the role of $c$ are
-given in `[R] regress`, p. 22. Pages 9--10 explain that `noconstant`, unlike
-`hascons`, uses the uncentered ANOVA convention.
+degrees of freedom are $N-c$. Lai and Xing (2008), p. 7, equations
+(1.9)--(1.10), support the residual degrees of freedom and residual-variance
+formula for a full-rank model. The role of $c$ and the no-constant reporting
+parameterization are Stata compatibility conventions: `[R] regress`, pp. 8--10
+and 22, explains that `noconstant`, unlike `hascons`, uses the uncentered ANOVA
+convention.
 
 ## Model, objective, and coefficients
 
@@ -49,15 +52,19 @@ The estimator minimizes the residual sum of squares,
             =(X'X)^{-1}X'y.
 \]
 
-This is `[R] regress`, p. 22, equation (2). The inverse representation requires
-full column rank. Tabra orders the slope coefficients as supplied by `x` and
-appends `_cons` only for `is_con=True`; the no-constant case has no `_cons`
-entry.
+Lai and Xing (2008), p. 4, equation (1.2), gives the least-squares objective;
+p. 5, equations (1.4)--(1.5), gives the coefficient solution and associated
+orthogonal decomposition. The inverse representation requires full column
+rank. `[R] regress`, p. 22, equation (2), is a software-compatibility
+cross-check. Tabra orders the slope coefficients as supplied by `x` and appends
+`_cons` only for `is_con=True`; the no-constant case has no `_cons` entry.
 
 ## ANOVA decomposition and fit statistics
 
-Let $e=y-X\hat\beta$. Using the $c$ convention above, `[R] regress`,
-pp. 22--23, defines
+Let $e=y-X\hat\beta$. Lai and Xing (2008), p. 5, equation (1.4) and the
+following RSS definition, supports $RSS=e'e$. Its pp. 10--12, equations
+(1.23)--(1.25) and Table 1.1, supports the centered sums-of-squares and
+degrees-of-freedom decomposition. Using the $c$ convention above,
 
 \[
 RSS=e'e,
@@ -99,17 +106,20 @@ F=\frac{MSS/(k-c)}{RSS/(N-k)}
 Root\ MSE=s=\sqrt{\frac{RSS}{N-k}}.
 \]
 
-These formulas appear in `[R] regress`, p. 22 for the sums of squares, their
-degrees of freedom, $s^2$, and Root MSE, and p. 23 for $F$, $R^2$, and
-adjusted $R^2$. In the `basic` case $c=1$; in `no_constant` $c=0$, so
-TSS is uncentered, model and total degrees of freedom increase by one relative
-to an intercept fit with the same $k$, and the adjusted-$R^2$ numerator is
-$N$, not $N-1$.
+Lai and Xing (2008), pp. 13--14, equations (1.27)--(1.28), supports the
+intercept-model $R^2$ and adjusted $R^2$ formulas. Its p. 7, equations
+(1.9)--(1.10), supports $s^2=RSS/(N-k)$ and Root MSE. `[R] regress`, pp. 9--10
+and 22--23, supplies the software-specific no-constant parameterization and
+cross-checks the reported quantities. In the `basic` case $c=1$; in
+`no_constant` $c=0$, so TSS is uncentered, model and total degrees of freedom
+increase by one relative to an intercept fit with the same $k$, and the
+adjusted-$R^2$ numerator is $N$, not $N-1$. Lai and Xing equation (1.28) does
+not directly support this no-constant version.
 
 ## Classical covariance and inference
 
-The conventional homoskedastic covariance estimator is `[R] regress`, p. 23,
-equation (3):
+Lai and Xing (2008), p. 7, equations (1.9)--(1.10), supports the conventional
+homoskedastic covariance estimator and the residual-variance estimate:
 
 \[
 \widehat{V}(\hat\beta)=s^2(X'X)^{-1}.
@@ -133,11 +143,24 @@ $c=1$, and for all $k$ coefficients when $c=0$. Its normalized p-value is
 p_F=\Pr\{F_{k-c,N-k}\ge F\}.
 \]
 
-`[R] regress`, p. 7, describes the coefficient t tests as two-sided and the
-overall F p-value as the probability of an F statistic at least as large as the
-reported value. Page 23 supplies the F formula and its two degrees of freedom.
-Page 26 specifies that homoskedastic-regression coefficient p-values and
-confidence intervals use a t distribution with $N-k$ degrees of freedom.
+Lai and Xing (2008), pp. 8--10, equations (1.11)--(1.14) and (1.22), supports
+the exact t distribution under normal errors, coefficient tests, and the
+two-sided absolute-value statistic. Its pp. 10--12, equations (1.23)--(1.25)
+and Table 1.1, supports the F ratio and right-tail rejection rule. Fisher
+(1922), journal pp. 607--610, section 6, is original-paper support for
+finite-sample t inference for regression coefficients: p. 608 uses the
+$n-2$ residual-variance divisor for simple regression, and pp. 609--610 extends
+the argument to multiple orthogonal regression coefficients and the Student
+Type VII distribution. Fisher is not used as if it stated the modern matrix
+formulas.
+
+For software compatibility, `[R] regress`, p. 7, describes the coefficient t
+tests as two-sided and the overall F p-value as the probability of an F
+statistic at least as large as the reported value. Page 23 supplies the Stata F
+formula and its two degrees of freedom. Page 26 specifies that
+homoskedastic-regression coefficient p-values and confidence intervals use a t
+distribution with $N-k$ degrees of freedom. Its p. 22, equation (2), and p. 23,
+equation (3), cross-check the Stata coefficient and covariance parameterization.
 
 ## Assumptions and interpretation boundary
 
@@ -160,8 +183,11 @@ conditions:
    tails are not exact finite-sample probabilities merely because software can
    compute them.
 5. Complete-case fitting changes the target sample. Population interpretation
-   requires a defensible missing-data/selection argument; the frozen fixture
-   contains no missing values and does not validate such an argument.
+   requires a defensible missing-data/selection argument. The frozen
+   three-engine fixture contains no missing values, while
+   `tests/test_ols.py::test_partial_missing_rows_use_joint_complete_case_sample`
+   independently verifies the joint complete-case implementation. That unit
+   test does not establish that the missingness mechanism is ignorable.
 6. None of these conditions makes a coefficient causal. A causal or structural
    interpretation needs a separate identification design and a defense against
    confounding, simultaneity, measurement error, and other endogeneity.
@@ -174,24 +200,46 @@ the frozen `basic` and `no_constant` cases do not exercise degenerate designs.
 
 ## Sources and evidence roles
 
-- StataCorp LLC (2025), *Stata 19 Base Reference Manual*, `[R] regress`,
-  <https://www.stata.com/manuals/rregress.pdf>. Exact locations used here are
-  pp. 7, 9--10, 15, 22--23, and 26. This official manual is the authoritative
-  formula and Stata-compatibility source for the supported contract.
-- Aitken, A. C. (1936), “On Least Squares and Linear Combination of
-  Observations,” *Proceedings of the Royal Society of Edinburgh* 55, 42--48,
-  <https://doi.org/10.1017/S0370164600014346>. This is historical primary
-  context; no equation or narrower page claim from it is used in the formula
-  map.
+### Mathematical source
+
+- Lai, T. L. and Xing, H. (2008), *Statistical Models and Methods for Financial
+  Markets*, Springer Texts in Statistics,
+  <https://doi.org/10.1007/978-0-387-77827-3>. The formula map uses the printed
+  book pages and equations: p. 4, equation (1.2); p. 5, equations (1.4)--(1.5)
+  and the following RSS definition; p. 7, equations (1.9)--(1.10); pp. 8--10,
+  equations (1.11)--(1.14) and (1.22); pp. 10--12, equations (1.23)--(1.25)
+  and Table 1.1; and pp. 13--14, equations (1.27)--(1.28).
+
+### Original historical sources
+
 - Fisher, R. A. (1922), “The Goodness of Fit of Regression Formulae, and the
   Distribution of Regression Coefficients,” *Journal of the Royal Statistical
-  Society* 85(4), 597--612, <https://doi.org/10.2307/2341124>. This is primary
-  context for regression inference; no unverified equation location from it is
-  asserted here.
+  Society* 85(4), 597--612, <https://doi.org/10.2307/2341124>, scanned-record
+  copy at <http://hdl.handle.net/2440/15174>. Journal pp. 607--610, section 6,
+  supports the finite-sample regression-coefficient t inference described
+  above. It is mapped only to `REG-T-001` and `REG-TP-001` and is not treated as
+  a source of modern matrix notation.
+- Aitken, A. C. (1936), “On Least Squares and Linear Combination of
+  Observations,” *Proceedings of the Royal Society of Edinburgh* 55, 42--48,
+  <https://doi.org/10.1017/S0370164600014346>. This is historical background
+  only. No formula-level location was verified for the current contract, so it
+  is excluded from release-critical formula mapping and from the manifest's
+  primary sources.
 - White, H. (1980), “A Heteroskedasticity-Consistent Covariance Matrix
   Estimator and a Direct Test for Heteroskedasticity,” *Econometrica* 48(4),
   817--838, <https://doi.org/10.2307/1912934>. This identifies the excluded
   robust extension only; it is not support for an implemented `reg` option.
+
+### Stata compatibility source
+
+- StataCorp LLC (2025), *Stata 19 Base Reference Manual*, `[R] regress`,
+  <https://www.stata.com/manuals/rregress.pdf>. This source defines the target
+  software behavior: p. 15 for complete-case selection; pp. 8--10 and 22--23
+  for constant/no-constant, centered/uncentered TSS, degrees of freedom, and
+  reporting conventions; and pp. 7 and 26 for two-sided coefficient t
+  probabilities, right-tailed F interpretation, and the $N-k$ homoskedastic
+  reference degrees of freedom. Page 22, equation (2), and p. 23, equation (3),
+  are compatibility cross-checks, not the sole mathematical source.
 
 The independent executable oracle is
 `validation/commands/reg/oracles/code_audit_oracle.py::derive_case`. It imports

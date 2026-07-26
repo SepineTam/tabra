@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -775,3 +776,48 @@ def test_cli_returns_nonzero_for_failed_scientific_comparison(tmp_path):
         args.extend(["--result", str(path)])
 
     assert main(args) == 1
+
+
+def test_reg_formula_map_separates_mathematical_and_compatibility_sources():
+    formula_map_path = (
+        Path(__file__).resolve().parents[1]
+        / "validation"
+        / "commands"
+        / "reg"
+        / "formula_map.csv"
+    )
+    with formula_map_path.open(encoding="utf-8", newline="") as formula_map_file:
+        rows = list(csv.DictReader(formula_map_file))
+
+    required_columns = {
+        "mathematical_reference",
+        "mathematical_location",
+        "compatibility_reference",
+        "compatibility_location",
+    }
+    assert required_columns <= set(rows[0])
+
+    software_specific_formula_ids = {
+        "REG-CASE-001",
+        "REG-SAMPLE-001",
+        "REG-PARAM-001",
+        "REG-NOCONSTANT-001",
+    }
+    for row in rows:
+        if row["status"] != "implemented":
+            continue
+        assert row["compatibility_reference"]
+        assert row["compatibility_location"]
+        if row["formula_id"] in software_specific_formula_ids:
+            assert row["mathematical_reference"] == "not_applicable"
+            assert row["mathematical_location"] == "not_applicable"
+        else:
+            assert row["mathematical_reference"] not in {
+                "",
+                "not_applicable",
+            }
+            assert row["mathematical_location"] not in {
+                "",
+                "not_applicable",
+            }
+            assert "StataCorp" not in row["mathematical_reference"]

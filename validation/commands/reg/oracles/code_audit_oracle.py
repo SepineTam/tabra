@@ -21,8 +21,8 @@ from scipy import stats
 
 
 FROZEN_HASHES = {
-    "manifest": "533e96bde7c0fd15dcc532f127789ab300c21f378c7b344ac99be6a4cafa26d7",
-    "cases": "d6dc76648bcd0433795b60c2f65d46cc89167565384c23e24d864525d42ea7e7",
+    "manifest": "3ace49ec0668c8deb699db3e6db90ade5f7e7a8105c61ff9163dd438c628068e",
+    "cases": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
     "data": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
 }
 

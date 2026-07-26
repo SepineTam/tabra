@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "specification_version": "2.0.0",
+  "specification_version": "2.0.1",
   "command": "reg",
   "public_api": "TabraData.est.reg(y, x, is_con=True)",
   "implementation": "src/tabra/models/estimate/ols.py::OLS.fit",
@@ -140,14 +140,27 @@
   "formula_map": "formula_map.csv",
   "primary_sources": [
     {
-      "id": "stata-regress-19",
-      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress",
-      "url": "https://www.stata.com/manuals/rregress.pdf"
+      "id": "lai-xing-2008",
+      "role": "mathematical",
+      "citation": "Lai, T. L. and Xing, H. (2008), Statistical Models and Methods for Financial Markets, Springer Texts in Statistics",
+      "doi": "10.1007/978-0-387-77827-3",
+      "url": "https://link.springer.com/book/10.1007/978-0-387-77827-3",
+      "exact_locations": "p. 4 eq. (1.2); p. 5 eqs. (1.4)-(1.5) and following RSS definition; p. 7 eqs. (1.9)-(1.10); pp. 8-10 eqs. (1.11)-(1.14) and (1.22); pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1; pp. 13-14 eqs. (1.27)-(1.28)"
     },
     {
-      "id": "aitken-1936",
-      "citation": "Aitken (1936), On Least Squares and Linear Combination of Observations",
-      "doi": "10.1017/S0370164600014346"
+      "id": "fisher-1922",
+      "role": "mathematical",
+      "citation": "Fisher, R. A. (1922), The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients, JRSS 85(4):597-612",
+      "doi": "10.2307/2341124",
+      "url": "http://hdl.handle.net/2440/15174",
+      "exact_locations": "journal pp. 607-610, section 6"
+    },
+    {
+      "id": "stata-regress-19",
+      "role": "software_compatibility",
+      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "exact_locations": "p. 15; pp. 8-10 and 22-23; pp. 7 and 26; p. 22 eq. (2); p. 23 eq. (3)"
     }
   ],
   "normalized_result_schema": "../../schema/normalized-result.schema.json"
