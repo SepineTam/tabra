@@ -20,6 +20,32 @@ class TestLoadData:
         data = load_data(sample_df)
         assert hasattr(data, "reg")
 
+    def test_loads_csv_path(self, sample_df, tmp_path):
+        csv_path = tmp_path / "sample.csv"
+        sample_df.to_csv(csv_path, index=False)
+
+        data = load_data(csv_path, is_display_result=False)
+
+        pd.testing.assert_frame_equal(data._df, sample_df)
+
+    def test_missing_path_raises_immediately(self, tmp_path):
+        missing_path = tmp_path / "does-not-exist.csv"
+
+        with pytest.raises(FileNotFoundError, match=str(missing_path)):
+            load_data(missing_path, is_display_result=False)
+
+    def test_unsupported_file_format_raises_immediately(self, tmp_path):
+        unsupported_path = tmp_path / "sample.txt"
+        unsupported_path.write_text("x\n1\n", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="Unsupported data file format '.txt'"):
+            load_data(unsupported_path, is_display_result=False)
+
+    @pytest.mark.parametrize("invalid_input", [None, 123, [1, 2, 3]])
+    def test_invalid_input_type_raises_immediately(self, invalid_input):
+        with pytest.raises(TypeError, match="DataFrame or a supported file path"):
+            load_data(invalid_input, is_display_result=False)
+
 
 class TestRegAPI:
     def test_reg_with_constant(self, sample_df):

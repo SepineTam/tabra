@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Command Code"
+  short_description: "Audit implementation and independent numerical oracles"
+  default_prompt: "Audit this command implementation from source code and independent formulas."

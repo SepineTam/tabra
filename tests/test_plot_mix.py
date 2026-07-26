@@ -1,6 +1,4 @@
 import pytest
-import pandas as pd
-import matplotlib.pyplot as plt
 
 from tabra import load_data
 from tests.auto_data import load_auto_df
@@ -87,3 +85,7 @@ class TestMix:
         """Empty layers list raises error."""
         with pytest.raises(ValueError, match="layer"):
             tab.plot.mix([])
+
+    def test_declared_but_unsupported_kind_raises(self, tab):
+        with pytest.raises(ValueError, match="box.*not supported"):
+            tab.plot.mix([{PlotKind.box: {"var": "price"}}])

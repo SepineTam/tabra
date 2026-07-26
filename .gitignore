@@ -206,6 +206,10 @@ cython_debug/
 .learn/
 .verify/
 
+# Validation runner scratch output (normalized evidence stays trackable)
+validation/runs/**/raw/
+validation/runs/**/.tmp/
+
 tmp/
 cookbook/
 

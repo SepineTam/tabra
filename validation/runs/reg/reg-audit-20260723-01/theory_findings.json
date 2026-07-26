@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-audit-20260723-01",
+  "audit_date": "2026-07-23",
+  "theory_audit_status": "FAIL",
+  "gate_decision_issued": false,
+  "blocked_environment": false,
+  "frozen_inputs": {
+    "commit": "0242978e7add4a7d44ab2056c4cbc9657f24a5f9",
+    "manifest_sha256": "533e96bde7c0fd15dcc532f127789ab300c21f378c7b344ac99be6a4cafa26d7",
+    "cases_sha256": "d6dc76648bcd0433795b60c2f65d46cc89167565384c23e24d864525d42ea7e7",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "theory_sha256": "37c8f490413a42bc559073b4336208eb2e90e7fa6a29ed858b0c332aaab6fe84",
+    "formula_map_sha256": "5cda46c1f134e52af159b3249d8a570dbf808bda3c6f90129cee98c61bac8223",
+    "tracked_worktree_dirty": true
+  },
+  "formula_map_summary": {
+    "row_count": 7,
+    "implemented": 3,
+    "provisional": 3,
+    "blocked_unsupported": 1,
+    "complete_release_critical_coverage": false
+  },
+  "authoritative_sources": [
+    {
+      "citation": "StataCorp LLC. 2025. Stata 19 Base Reference Manual, [R] regress.",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "locations": ["pp. 9-10", "pp. 22-23", "p. 26"],
+      "role": "authoritative formulas and Stata software-compatibility parameterization"
+    },
+    {
+      "citation": "Fisher, R. A. 1922. The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients. Journal of the Royal Statistical Society 85(4): 597-612.",
+      "doi": "https://doi.org/10.2307/2341124",
+      "role": "original methodological context; not precisely located by the frozen formula map"
+    },
+    {
+      "citation": "Aitken, A. C. 1936. On Least Squares and Linear Combination of Observations. Proceedings of the Royal Society of Edinburgh 55: 42-48.",
+      "doi": "https://doi.org/10.1017/S0370164600014346",
+      "role": "original source cited by frozen map; frozen rows do not assert an exact equation"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "TA-REG-001",
+      "severity": "critical",
+      "category": "missing_exact_source",
+      "status": "open",
+      "formula_ids": ["REG-R2-001", "REG-R2-002", "REG-F-001"],
+      "evidence": [
+        "validation/commands/reg/formula_map.csv:5-7 records provisional status and page_or_equation=not_asserted",
+        "Stata [R] regress pp. 22-23 supplies the exact TSS, R-squared, adjusted R-squared, F, df, and covariance formulas"
+      ],
+      "consequence": "A release-critical missing citation cannot pass theory audit.",
+      "required_action": "Record the exact authoritative citation, page/formula, assumptions, parameterization, code, tests/cases, status, and limitations in a newly frozen formula map."
+    },
+    {
+      "finding_id": "TA-REG-002",
+      "severity": "critical",
+      "category": "unmapped_reported_quantities",
+      "status": "open",
+      "affected_outputs": [
+        "nobs",
+        "df_model",
+        "df_resid",
+        "parameter_names",
+        "test_statistics",
+        "p_values",
+        "r_squared_adj",
+        "f_p_value",
+        "ss_residual",
+        "ss_model",
+        "ss_total",
+        "root_mse",
+        "confidence_intervals",
+        "anova_total_df",
+        "anova_total_ms"
+      ],
+      "evidence": [
+        "validation/commands/reg/manifest.yaml:28-51 lists normalized required metrics",
+        "src/tabra/results/ols_result.py:107-165 publicly reports additional ANOVA and confidence-interval quantities",
+        "validation/commands/reg/formula_map.csv contains no complete rows for these objects"
+      ],
+      "consequence": "Reported statistical quantities lack end-to-end theory, code, and test traceability.",
+      "required_action": "Add one or more precise formula-map rows covering every reported object and each constant convention."
+    },
+    {
+      "finding_id": "TA-REG-003",
+      "severity": "high",
+      "category": "implementation_conflict",
+      "status": "open",
+      "affected_case_ids": ["no_constant"],
+      "authoritative_rule": "With no intercept, c=0, total df=N and total MS=TSS/N; Stata [R] regress p. 22.",
+      "code_locations": [
+        "src/tabra/results/ols_result.py:113",
+        "src/tabra/results/ols_result.py:150"
+      ],
+      "evidence": "The summary hard-codes N-1 for both total mean square and total degrees of freedom, and OLSResult does not retain the constant indicator.",
+      "test_gap": "No no-constant summary test asserts total df or total MS.",
+      "required_action": "Carry the constant convention into OLSResult, compute/display total df as N-c, and add an independent no-constant summary test."
+    },
+    {
+      "finding_id": "TA-REG-004",
+      "severity": "high",
+      "category": "incomplete_code_test_mapping",
+      "status": "open",
+      "evidence": [
+        "R-squared is defined in src/tabra/models/estimate/stats.py:34-37 but frozen rows point only to OLS.fit",
+        "F is defined in src/tabra/models/estimate/stats.py:40-44 but the frozen row points to a delegating BaseModel wrapper",
+        "Rows claiming basic|no_constant list only basic-specific tests",
+        "tests/test_ols.py:181-189 checks coefficient p-values only for range, not an independent numerical oracle"
+      ],
+      "required_action": "Map exact implementation sites and at least one independent test or frozen validation case for every release-critical formula and convention."
+    },
+    {
+      "finding_id": "TA-REG-005",
+      "severity": "medium",
+      "category": "assumptions_and_parameterization",
+      "status": "open",
+      "evidence": [
+        "Exact finite-sample t/F inference requires Gaussian spherical errors conditional on X, but no t/p/F-p formula row records this assumption",
+        "src/tabra/models/estimate/ols.py uses SSR for residual SS and SSE for model SS; affected rows do not warn about this convention",
+        "src/tabra/models/estimate/stats.py:22-44 has degenerate-value guards not documented as limitations"
+      ],
+      "required_action": "Record inferential assumptions, complete-case sampling, notation translation, degenerate-input behavior, and causal interpretation limits."
+    }
+  ],
+  "decision_reasons": [
+    "Three release-critical frozen rows explicitly remain provisional without exact source locations.",
+    "Multiple reported quantities have no complete formula-map row.",
+    "The no-constant public summary conflicts with the authoritative total-df and total-MS convention.",
+    "Required papers, official documentation, data, and source locations were accessible, so BLOCKED_ENV does not apply."
+  ]
+}

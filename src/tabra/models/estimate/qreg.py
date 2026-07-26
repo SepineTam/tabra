@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : qreg.py
 
+# Scientific support: EST-QREG in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from scipy import optimize, stats as sp_stats
 

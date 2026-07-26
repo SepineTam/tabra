@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compare Three Engines"
+  short_description: "Compare Python, Stata, and R results without majority voting"
+  default_prompt: "Compare normalized Python, Stata, and R outputs using the frozen specification."

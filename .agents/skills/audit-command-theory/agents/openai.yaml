@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Command Theory"
+  short_description: "Map primary-source econometric formulas to code and tests"
+  default_prompt: "Audit this command against its primary literature and mathematical model."

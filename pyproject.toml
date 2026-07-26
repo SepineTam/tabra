@@ -16,11 +16,11 @@ dependencies = [
     "statsmodels>=0.14.6",
 ]
 
+[project.scripts]
+tabra-validate = "tabra.validation.cli:main"
+
 [project.optional-dependencies]
 all = ["psutil>=5.9.0"]
-
-[project.scripts]
-tabra = "tabra:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -28,7 +28,7 @@ pythonpath = ["src"]
 addopts = "--cov=src/tabra/api --cov=src/tabra/core --cov=src/tabra/models --cov=src/tabra/ops --cov=src/tabra/results --cov=src/tabra/utils --cov-report=term-missing --cov-fail-under=80"
 
 [build-system]
-requires = ["uv_build>=0.10.9,<0.11.0"]
+requires = ["uv_build>=0.11.0,<0.12.0"]
 build-backend = "uv_build"
 
 [dependency-groups]

@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : reghdfe.py
 
+# Scientific support: EST-HDFE in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from tabra.models.estimate.base import BaseModel
 from tabra.ops.linalg import mat_mul, mat_transpose, mat_inv

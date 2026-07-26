@@ -9,14 +9,17 @@
 
 import numpy as np
 
+from tabra.results.base import BaseResult
 
-class OrderedChoiceResult:
+
+class OrderedChoiceResult(BaseResult):
     def __init__(self, coef, std_err, z_stat, p_value,
                  cutpoints, cutpoint_se, cutpoint_z, cutpoint_p,
                  ll, ll_0, pseudo_r2, chi2, chi2_pval,
                  n_obs, k_vars, k_cat, df_m,
                  var_names, y_name, categories,
                  converged, model_name, V):
+        super().__init__()
         self.coef = np.asarray(coef)
         self.std_err = np.asarray(std_err)
         self.z_stat = np.asarray(z_stat)
@@ -41,17 +44,6 @@ class OrderedChoiceResult:
         self.model_name = model_name
         self.V = V
 
-        self._style = "stata"
-        self._display = False
-
-    def set_style(self, style: str):
-        self._style = style
-
-    def set_display(self, is_display: bool):
-        self._display = is_display
-        if is_display:
-            print(self._summary())
-
     def summary(self):
         return self._summary()
 
@@ -69,7 +61,6 @@ class OrderedChoiceResult:
         lines.append(header)
         lines.append("-" * 90)
 
-        from scipy import stats as sp_stats
         for i, name in enumerate(self.var_names):
             z = self.z_stat[i]
             p = self.p_value[i]
@@ -89,5 +80,6 @@ class OrderedChoiceResult:
 
         return "\n".join(lines)
 
-    def __repr__(self):
-        return self._summary()
+    def save(self, path="ordered_choice_result.txt"):
+        with open(path, "w") as file:
+            file.write(self.formatted_summary())

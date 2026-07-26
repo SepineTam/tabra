@@ -7,7 +7,6 @@
 # @Email  : sepinetam@gmail.com
 # @File   : ols_result.py
 
-import numpy as np
 from tabra.results.base import BaseResult
 
 
@@ -16,7 +15,7 @@ class OLSResult(BaseResult):
                  r_squared, r_squared_adj, f_stat, f_pval,
                  resid, fitted, n_obs, k_vars, var_names,
                  SSR, SSE, SST, df_model, df_resid, mse, root_mse,
-                 y_name=""):
+                 y_name="", is_con=True):
         super().__init__()
         self._coef = coef
         self._std_err = std_err
@@ -39,6 +38,7 @@ class OLSResult(BaseResult):
         self._mse = mse
         self._root_mse = root_mse
         self._y_name = y_name
+        self._is_con = is_con
 
     @property
     def coef(self):
@@ -110,7 +110,8 @@ class OLSResult(BaseResult):
         lines = []
         ms_model = self._SSE / self._df_model if self._df_model > 0 else 0.0
         ms_resid = self._mse
-        ms_total = self._SST / (self._n_obs - 1)
+        total_df = self._n_obs - (1 if self._is_con else 0)
+        ms_total = self._SST / total_df
 
         # Dynamic column widths based on actual data
         ss_w = max(
@@ -147,7 +148,7 @@ class OLSResult(BaseResult):
 
         lines.append(f"{sep:<{LW}s}{right('Adj R-squared', self._r_squared_adj)}")
 
-        tot = left("Total", f"{self._SST:>{ss_w}.4f}", self._n_obs - 1, f"{ms_total:>{ms_w}.6f}")
+        tot = left("Total", f"{self._SST:>{ss_w}.4f}", total_df, f"{ms_total:>{ms_w}.6f}")
         lines.append(f"{tot:<{LW}s}{right('Root MSE', self._root_mse)}")
         lines.append("")
         lines.append(f"{'-' * 76}")

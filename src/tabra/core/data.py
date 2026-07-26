@@ -16,6 +16,7 @@ from tabra.core.about import About
 from tabra.core.config import Config
 from tabra.core.data_ops import DataOps
 from tabra.core.est_accessor import EstAccessor
+from tabra.core.result_store import ResultStore
 from tabra.plot import PlotOps
 
 
@@ -44,10 +45,23 @@ class TabraData:
         self._panel_var = None
         self._time_var = None
         self._config = Config(self)
+        self._results = ResultStore()
+
+        # Accessors are session objects. Reusing them keeps state predictable and
+        # avoids constructing a new wrapper for every attribute access.
+        self._data_accessor = DataOps(self)
+        self._est_accessor = EstAccessor(self)
+        self._plot_accessor = PlotOps(self)
+        self._about_accessor = About(self)
 
     @property
     def result(self):
         return self._result
+
+    @property
+    def results(self) -> ResultStore:
+        """Completed command results for this analysis session."""
+        return self._results
 
     @property
     def model(self):
@@ -55,7 +69,7 @@ class TabraData:
 
     @property
     def data(self) -> DataOps:
-        return DataOps(self)
+        return self._data_accessor
 
     @property
     def config(self) -> Config:
@@ -67,15 +81,39 @@ class TabraData:
 
     @property
     def plot(self) -> PlotOps:
-        return PlotOps(self)
+        return self._plot_accessor
 
     @property
     def est(self) -> EstAccessor:
-        return EstAccessor(self)
+        return self._est_accessor
 
     @property
     def about(self) -> About:
-        return About(self)
+        return self._about_accessor
+
+    def _finalize_result(self, result, *, command: str, model=None):
+        """Apply the common result lifecycle used by every command.
+
+        A command result must support the small ``BaseResult`` interface. The
+        concrete result type remains free to expose model-specific statistics.
+        """
+        required_methods = ("set_style", "set_command", "set_display")
+        missing = [name for name in required_methods if not hasattr(result, name)]
+        if missing:
+            missing_text = ", ".join(missing)
+            raise TypeError(
+                f"Command result {type(result).__name__} is missing: {missing_text}"
+            )
+
+        result.set_style(self._style)
+        result.set_command(command)
+        self._result = result
+        self._model = model
+        self._results.add(result, command=command, model=model)
+
+        if self._is_display_result:
+            result.set_display(True)
+        return result
 
     def set_style(self, style: str):
         """Set the output display style.

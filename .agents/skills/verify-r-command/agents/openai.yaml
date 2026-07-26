@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify R Command"
+  short_description: "Run locked R references and normalize complete results"
+  default_prompt: "Run the R reference cases for this command and normalize every result."

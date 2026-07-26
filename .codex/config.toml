@@ -1,0 +1,3 @@
+[mcp_servers.stata-mcp]
+command = "/opt/homebrew/bin/uvx"
+args = ["stata-mcp"]

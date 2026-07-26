@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare Command Spec"
+  short_description: "Freeze command validation scope, cases, metrics, and tolerances"
+  default_prompt: "Prepare a reproducible validation specification for this econometric command."

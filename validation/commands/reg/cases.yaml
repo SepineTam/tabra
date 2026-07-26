@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "command": "reg",
+  "cases": [
+    {
+      "case_id": "basic",
+      "dependent": "y",
+      "independent": ["x1", "x2"],
+      "include_constant": true,
+      "covariance": "homoskedastic",
+      "r_formula": "y ~ x1 + x2",
+      "stata_command": "regress y x1 x2"
+    },
+    {
+      "case_id": "no_constant",
+      "dependent": "y",
+      "independent": ["x1", "x2"],
+      "include_constant": false,
+      "covariance": "homoskedastic",
+      "r_formula": "y ~ x1 + x2 - 1",
+      "stata_command": "regress y x1 x2, noconstant"
+    }
+  ],
+  "excluded_cases": [
+    {
+      "case_id": "robust",
+      "status": "blocked_by_missing_tabra_feature",
+      "required_change": "Add an explicit covariance option to Tabra reg and independently validate the sandwich covariance before enabling this case."
+    }
+  ]
+}

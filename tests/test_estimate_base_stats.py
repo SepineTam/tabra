@@ -41,10 +41,10 @@ def test_pseudo_r_squared_handles_zero_null_ll():
     assert _DummyModel._pseudo_r_squared(-10.0, -20.0) == pytest.approx(0.5)
 
 
-def test_f_statistics_return_zero_when_df_invalid():
+def test_f_statistics_return_nan_when_df_invalid():
     f_stat, f_p = _DummyModel._f_statistics(10.0, 5.0, 0, 90)
-    assert f_stat == 0.0
-    assert f_p == 0.0
+    assert np.isnan(f_stat)
+    assert np.isnan(f_p)
 
 
 def test_f_statistics_match_manual_formula_when_valid():
@@ -103,8 +103,8 @@ def test_adjusted_r_squared_returns_zero_when_df_resid_non_positive():
 
 def test_f_statistics_handles_non_positive_ssr():
     f_stat, f_p = EstimationStats.f_statistics(sse=10.0, ssr=0.0, df_model=2, df_resid=20)
-    assert f_stat == 0.0
-    assert f_p == 0.0
+    assert np.isnan(f_stat)
+    assert np.isnan(f_p)
 
 
 def test_chi2_p_value_returns_one_when_df_non_positive():

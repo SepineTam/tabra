@@ -7,6 +7,8 @@
 # @Email  : sepinetam@gmail.com
 # @File   : ordered_choice.py
 
+# Scientific support: EST-OPROBIT and EST-OLOGIT in SCIENTIFIC_SUPPORT.csv.
+
 import numpy as np
 from abc import abstractmethod
 from scipy import stats as sp_stats

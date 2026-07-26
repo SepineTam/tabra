@@ -73,7 +73,7 @@ class TestTPval:
         from tabra.ops.stats import t_pval
 
         result = t_pval(1.96, 1000)
-        expected = 2 * (1 - sp_stats.t.cdf(abs(1.96), 1000))
+        expected = 2 * sp_stats.t.sf(abs(1.96), 1000)
         assert abs(result - expected) < 1e-10
         assert abs(result - 0.05) < 0.005  # 约等于 0.05
 
@@ -90,6 +90,17 @@ class TestTPval:
 
         result = t_pval(100, 5)
         assert result < 0.0001
+
+    def test_extreme_value_preserves_tail_probability(self):
+        """An extreme statistic should retain its representable tail probability."""
+        from tabra.ops.stats import t_pval
+
+        result = t_pval(20.0, 100)
+        expected = 2 * sp_stats.t.sf(20.0, 100)
+
+        assert 2 * (1 - sp_stats.t.cdf(20.0, 100)) == 0.0
+        assert result > 0.0
+        assert result == pytest.approx(expected, rel=1e-15)
 
     def test_negative_value(self):
         """测试负值，应与正值相同（双尾）"""
@@ -108,7 +119,7 @@ class TestFPval:
         from tabra.ops.stats import f_pval
 
         result = f_pval(3.0, 2, 50)
-        expected = 1 - sp_stats.f.cdf(3.0, 2, 50)
+        expected = sp_stats.f.sf(3.0, 2, 50)
         assert abs(result - expected) < 1e-10
 
     def test_zero_value(self):
@@ -123,5 +134,16 @@ class TestFPval:
         from tabra.ops.stats import f_pval
 
         result = f_pval(100.0, 3, 30)
-        expected = 1 - sp_stats.f.cdf(100.0, 3, 30)
+        expected = sp_stats.f.sf(100.0, 3, 30)
         assert abs(result - expected) < 1e-10
+
+    def test_extreme_value_preserves_tail_probability(self):
+        """An extreme statistic should retain its representable tail probability."""
+        from tabra.ops.stats import f_pval
+
+        result = f_pval(500.0, 3, 100)
+        expected = sp_stats.f.sf(500.0, 3, 100)
+
+        assert 1 - sp_stats.f.cdf(500.0, 3, 100) == 0.0
+        assert result > 0.0
+        assert result == pytest.approx(expected, rel=1e-15)

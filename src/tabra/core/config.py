@@ -19,7 +19,7 @@ class Config:
         self._tabra = tabra
         self._plot_template = TEMPLATES["DEFAULT"]
         self._auto_create_missing_dir = True
-        self._figure_save_base = Path.cwd()
+        self._figure_save_base = None
         self._plot_block = True
 
     def set_plot_template(self, template: PlotTemplateBase):
@@ -59,8 +59,12 @@ class Config:
 
     @property
     def figure_save_base(self) -> Path:
-        """Base directory for relative figure save paths."""
-        return self._figure_save_base
+        """Effective base directory for relative figure save paths."""
+        if self._figure_save_base is not None:
+            return self._figure_save_base
+        if _global_figure_save_base is not None:
+            return _global_figure_save_base
+        return Path.cwd()
 
     def set_figure_save_base(self, path):
         """Set the base directory for relative figure save paths.

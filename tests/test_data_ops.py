@@ -246,6 +246,13 @@ class TestDataOpsIntegration:
         assert tab._df.loc[0, "c"] == 11.0
         assert tab._df.loc[3, "c"] == 0
 
+    def test_one_way_tabulate_returns_data_ops(self, data_ops_df):
+        tab = load_data(data_ops_df, is_display_result=False)
+
+        result = tab.data.tabulate("a")
+
+        assert result is tab.data
+
 
 class TestDataOpsWinsor2:
     @pytest.fixture
