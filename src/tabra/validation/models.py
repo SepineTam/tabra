@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from .errors import StateTransitionError
 
@@ -109,6 +110,9 @@ class CommandManifest:
     schema_version: int
     command: str
     engines: tuple[str, ...]
+    supported_cases: tuple[str, ...]
+    data_sha256: str
+    environment_requirements: Mapping[str, Any]
     metrics: tuple[MetricSpec, ...]
     tolerances_frozen: bool
     source_path: str

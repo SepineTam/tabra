@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -22,8 +24,12 @@ from tabra.validation import (
 )
 from tabra.validation.cli import main
 
-
 DATA_SHA256 = "a" * 64
+ENGINE_VERSIONS = {
+    "python": "3.11.11",
+    "stata": "19.5",
+    "r": "R version 4.4.1 (2024-06-14)",
+}
 
 
 def _write_json(path: Path, value: object) -> Path:
@@ -38,7 +44,15 @@ def _manifest_value() -> dict[str, object]:
         "command": "reg",
         "engines": ["python", "stata", "r"],
         "tolerances_frozen": True,
+        "environment_requirements": {
+            "python": {"minimum_version": "3.11"},
+            "stata": {"minimum_version": "16"},
+            "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"},
+        },
+        "supported_cases": ["basic", "no_constant"],
+        "data": {"sha256": DATA_SHA256},
         "metrics": {
+            "case_ids": {"tolerance": {"exact": True}},
             "nobs": {"tolerance": {"exact": True}},
             "coefficients": {"tolerance": {"atol": 1e-8, "rtol": 1e-6}},
         },
@@ -65,8 +79,16 @@ def _result_value(
         "sample": {"nobs": nobs, "data_sha256": data_sha256},
         "metrics": metrics
         if metrics is not None
-        else {"nobs": 100, "coefficients": [1.0, 2.0]},
-        "metadata": {"engine_version": "test"},
+        else {
+            "case_ids": ["basic", "no_constant"],
+            "nobs": 100,
+            "coefficients": [1.0, 2.0],
+        },
+        "metadata": {
+            "engine_version": ENGINE_VERSIONS[engine],
+            "dataset_path": "/frozen/reg_fixture.csv",
+            "case_status": ["completed", "completed"],
+        },
     }
 
 
@@ -78,6 +100,7 @@ def _load_complete_case(tmp_path: Path):
             _result_value(
                 engine,
                 metrics={
+                    "case_ids": ["basic", "no_constant"],
                     "nobs": 100,
                     "coefficients": [1.0 + index * 1e-9, 2.0],
                 },
@@ -92,17 +115,52 @@ def _load_complete_case(tmp_path: Path):
     )
 
 
-def _audit_value(kind: str, run_id: str = "test-run") -> dict[str, object]:
-    return {
+def _audit_value(
+    kind: str,
+    manifest_sha256: str,
+    commit: str,
+    run_id: str = "test-run",
+) -> dict[str, object]:
+    audit = {
         "schema_version": 1,
-        "kind": f"{kind}_audit",
         "command": "reg",
         "run_id": run_id,
-        "status": "passed",
-        "passed": True,
-        "skipped": False,
+        f"{kind}_audit_status": "PASS",
+        "frozen_inputs": {
+            "manifest_sha256": manifest_sha256,
+            "commit": commit,
+        },
         "findings": [],
     }
+    if kind == "code":
+        audit["audited_commit"] = commit
+    return audit
+
+
+def _patch_git_environment(monkeypatch, commit: str, *, dirty: bool = False):
+    monkeypatch.setattr(
+        "tabra.validation.gate.collect_environment",
+        lambda workdir=None: {
+            "python": {},
+            "platform": {},
+            "distributions": {},
+            "git": {"commit": commit, "tracked_files_dirty": dirty},
+        },
+    )
+
+
+def test_module_entry_point_exposes_cli_help():
+    completed_process = subprocess.run(
+        [sys.executable, "-m", "tabra.validation", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed_process.returncode == 0
+    assert "Run strict, auditable three-engine scientific validation" in (
+        completed_process.stdout
+    )
 
 
 def test_validation_status_allows_only_forward_auditable_transitions():
@@ -147,6 +205,16 @@ def test_manifest_is_immutable_and_requires_all_three_engines(tmp_path):
     _write_json(manifest_path, value)
     with pytest.raises(SchemaError, match="exactly python, stata, and r"):
         load_manifest(manifest_path)
+
+
+def test_manifest_retains_frozen_data_cases_and_engine_requirements(tmp_path):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+
+    manifest = load_manifest(manifest_path)
+
+    assert manifest.data_sha256 == DATA_SHA256
+    assert manifest.supported_cases == ("basic", "no_constant")
+    assert manifest.environment_requirements["r"]["locked_version"] == "4.4.1"
 
 
 def test_registry_resolves_manifests_and_blocks_path_escape(tmp_path):
@@ -196,6 +264,27 @@ def test_normalized_result_rejects_duplicate_keys_and_nonfinite_json(tmp_path):
         load_normalized_result(nan_path)
 
 
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        None,
+        {"dataset_path": "/data.csv", "case_status": ["completed"]},
+        {"engine_version": "3.11.11", "case_status": ["completed"]},
+        {"engine_version": "3.11.11", "dataset_path": "/data.csv"},
+    ],
+)
+def test_normalized_result_requires_complete_metadata(tmp_path, metadata):
+    value = _result_value("python")
+    if metadata is None:
+        value.pop("metadata")
+    else:
+        value["metadata"] = metadata
+    result_path = _write_json(tmp_path / "python.json", value)
+
+    with pytest.raises(SchemaError, match="metadata"):
+        load_normalized_result(result_path)
+
+
 def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
     manifest, results, _ = _load_complete_case(tmp_path)
 
@@ -207,6 +296,73 @@ def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
     assert len(report["metrics"][1]["pairs"]) == 3
 
 
+def test_comparison_rejects_shared_wrong_dataset(tmp_path):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = [
+        _write_json(
+            tmp_path / f"{engine}.json",
+            _result_value(engine, data_sha256="b" * 64),
+        )
+        for engine in ("python", "stata", "r")
+    ]
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert "dataset_hash_mismatch" in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
+def test_comparison_rejects_shared_case_omission(tmp_path):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = []
+    for engine in ("python", "stata", "r"):
+        value = _result_value(
+            engine,
+            metrics={
+                "case_ids": ["basic"],
+                "nobs": 100,
+                "coefficients": [1.0, 2.0],
+            },
+        )
+        value["metadata"]["case_status"] = ["completed"]
+        result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert "required_case_mismatch" in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
+def test_comparison_rejects_unapproved_engine_version(tmp_path):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = []
+    for engine in ("python", "stata", "r"):
+        value = _result_value(engine)
+        if engine == "r":
+            value["metadata"]["engine_version"] = "R version 4.4.2"
+        result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert "engine_version_mismatch" in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
 @pytest.mark.parametrize(
     ("engine", "overrides", "expected_code"),
     [
@@ -215,10 +371,20 @@ def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
         ("stata", {"converged": False}, "not_converged"),
         ("python", {"nobs": 99}, "sample_size_mismatch"),
         ("r", {"data_sha256": "b" * 64}, "sample_hash_mismatch"),
-        ("stata", {"metrics": {"nobs": 100}}, "missing_metric"),
+        (
+            "stata",
+            {"metrics": {"case_ids": ["basic", "no_constant"], "nobs": 100}},
+            "missing_metric",
+        ),
         (
             "python",
-            {"metrics": {"nobs": 100, "coefficients": [None, 2.0]}},
+            {
+                "metrics": {
+                    "case_ids": ["basic", "no_constant"],
+                    "nobs": 100,
+                    "coefficients": [None, 2.0],
+                }
+            },
             "unsafe_metric_value",
         ),
     ],
@@ -250,7 +416,14 @@ def test_out_of_tolerance_metric_and_missing_engine_fail(tmp_path):
     manifest, results, _ = _load_complete_case(tmp_path)
     changed_path = _write_json(
         tmp_path / "r-changed.json",
-        _result_value("r", metrics={"nobs": 100, "coefficients": [1.1, 2.0]}),
+        _result_value(
+            "r",
+            metrics={
+                "case_ids": ["basic", "no_constant"],
+                "nobs": 100,
+                "coefficients": [1.1, 2.0],
+            },
+        ),
     )
 
     mismatch_report = compare_results(
@@ -285,7 +458,13 @@ def test_probability_safety_rejects_zero_underflow_hidden_by_tolerance(tmp_path)
         result_paths.append(
             _write_json(
                 tmp_path / f"{engine}.json",
-                _result_value(engine, metrics={"p_values": [p_value]}),
+                _result_value(
+                    engine,
+                    metrics={
+                        "case_ids": ["basic", "no_constant"],
+                        "p_values": [p_value],
+                    },
+                ),
             )
         )
 
@@ -301,21 +480,25 @@ def test_probability_safety_rejects_zero_underflow_hidden_by_tolerance(tmp_path)
     )
 
 
-def test_gate_recomputes_evidence_and_generates_hashed_attestation(tmp_path):
+def test_gate_recomputes_evidence_and_generates_hashed_attestation(
+    tmp_path, monkeypatch
+):
     manifest, results, _ = _load_complete_case(tmp_path)
     comparison = compare_results(manifest, results)
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
 
     attestation = evaluate_gate(
         manifest,
         results,
         comparison,
         run_id="test-run",
-        code_audit=_audit_value("code"),
-        theory_audit=_audit_value("theory"),
+        code_audit=_audit_value("code", manifest.sha256, commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
         workdir=tmp_path,
     )
 
-    assert attestation["passed"] is True
+    assert attestation["passed"] is True, attestation
     assert attestation["kind"] == "validation_attestation"
     assert attestation["status"] == "passed"
     assert attestation["manifest"]["sha256"] == manifest.sha256
@@ -323,18 +506,20 @@ def test_gate_recomputes_evidence_and_generates_hashed_attestation(tmp_path):
     assert digest == sha256_json(attestation)
 
 
-def test_gate_rejects_edited_or_stale_comparison(tmp_path):
+def test_gate_rejects_edited_or_stale_comparison(tmp_path, monkeypatch):
     manifest, results, _ = _load_complete_case(tmp_path)
     comparison = compare_results(manifest, results)
     comparison["passed"] = False
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
 
     decision = evaluate_gate(
         manifest,
         results,
         comparison,
         run_id="test-run",
-        code_audit=_audit_value("code"),
-        theory_audit=_audit_value("theory"),
+        code_audit=_audit_value("code", manifest.sha256, commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
         workdir=tmp_path,
     )
 
@@ -356,17 +541,21 @@ def test_gate_requires_both_independent_audits(tmp_path):
     }
 
 
-def test_gate_rejects_an_audit_from_another_run(tmp_path):
+def test_gate_rejects_an_audit_from_another_run(tmp_path, monkeypatch):
     manifest, results, _ = _load_complete_case(tmp_path)
     comparison = compare_results(manifest, results)
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
 
     decision = evaluate_gate(
         manifest,
         results,
         comparison,
         run_id="current-run",
-        code_audit=_audit_value("code", "old-run"),
-        theory_audit=_audit_value("theory", "current-run"),
+        code_audit=_audit_value("code", manifest.sha256, commit, "old-run"),
+        theory_audit=_audit_value(
+            "theory", manifest.sha256, commit, "current-run"
+        ),
     )
 
     assert decision["passed"] is False
@@ -376,16 +565,123 @@ def test_gate_rejects_an_audit_from_another_run(tmp_path):
     )
 
 
+@pytest.mark.parametrize(
+    ("stale_field", "expected_code"),
+    [
+        ("manifest", "code_audit_manifest_mismatch"),
+        ("commit", "code_audit_commit_mismatch"),
+    ],
+)
+def test_gate_rejects_stale_audit_identity(
+    tmp_path, monkeypatch, stale_field, expected_code
+):
+    manifest, results, _ = _load_complete_case(tmp_path)
+    comparison = compare_results(manifest, results)
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
+    code_manifest = "d" * 64 if stale_field == "manifest" else manifest.sha256
+    code_commit = "d" * 40 if stale_field == "commit" else commit
+
+    decision = evaluate_gate(
+        manifest,
+        results,
+        comparison,
+        run_id="test-run",
+        code_audit=_audit_value("code", code_manifest, code_commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
+    )
+
+    assert decision["passed"] is False
+    assert expected_code in {
+        violation["code"] for violation in decision["violations"]
+    }
+
+
+def test_gate_rejects_missing_git_identity(tmp_path, monkeypatch):
+    manifest, results, _ = _load_complete_case(tmp_path)
+    comparison = compare_results(manifest, results)
+    commit = "c" * 40
+    monkeypatch.setattr(
+        "tabra.validation.gate.collect_environment",
+        lambda workdir=None: {
+            "git": {"commit": None, "tracked_files_dirty": None}
+        },
+    )
+
+    decision = evaluate_gate(
+        manifest,
+        results,
+        comparison,
+        run_id="test-run",
+        code_audit=_audit_value("code", manifest.sha256, commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
+        workdir=tmp_path,
+    )
+
+    assert decision["passed"] is False
+    assert decision["violations"][0]["code"] == "git_identity_unavailable"
+
+
+def test_gate_rejects_conflicting_audit_commit_fields(tmp_path, monkeypatch):
+    manifest, results, _ = _load_complete_case(tmp_path)
+    comparison = compare_results(manifest, results)
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
+    code_audit = _audit_value("code", manifest.sha256, commit)
+    code_audit["frozen_inputs"]["commit"] = "d" * 40
+
+    decision = evaluate_gate(
+        manifest,
+        results,
+        comparison,
+        run_id="test-run",
+        code_audit=code_audit,
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
+    )
+
+    assert decision["passed"] is False
+    assert "code_audit_commit_mismatch" in {
+        violation["code"] for violation in decision["violations"]
+    }
+
+
+def test_gate_rejects_unknown_git_cleanliness(tmp_path, monkeypatch):
+    manifest, results, _ = _load_complete_case(tmp_path)
+    comparison = compare_results(manifest, results)
+    commit = "c" * 40
+    monkeypatch.setattr(
+        "tabra.validation.gate.collect_environment",
+        lambda workdir=None: {
+            "git": {"commit": commit, "tracked_files_dirty": None}
+        },
+    )
+
+    decision = evaluate_gate(
+        manifest,
+        results,
+        comparison,
+        run_id="test-run",
+        code_audit=_audit_value("code", manifest.sha256, commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
+        workdir=tmp_path,
+    )
+
+    assert decision["passed"] is False
+    assert decision["violations"][0]["code"] == "git_cleanliness_unavailable"
+
+
 def test_gate_cli_never_overwrites_existing_evidence(tmp_path, capsys):
     manifest, results, result_paths = _load_complete_case(tmp_path)
     comparison_path = _write_json(
         tmp_path / "comparison.json", compare_results(manifest, results)
     )
     code_audit_path = _write_json(
-        tmp_path / "code-audit.json", _audit_value("code")
+        tmp_path / "code-audit.json",
+        _audit_value("code", manifest.sha256, "c" * 40),
     )
     theory_audit_path = _write_json(
-        tmp_path / "theory-audit.json", _audit_value("theory")
+        tmp_path / "theory-audit.json",
+        _audit_value("theory", manifest.sha256, "c" * 40),
     )
     output_path = _write_json(tmp_path / "attestation.json", {"keep": True})
     argv = [
@@ -411,14 +707,20 @@ def test_gate_cli_never_overwrites_existing_evidence(tmp_path, capsys):
     assert "Refusing to overwrite immutable gate output" in capsys.readouterr().out
 
 
-def test_cli_preflight_compare_and_gate(tmp_path, capsys):
+def test_cli_preflight_compare_and_gate(tmp_path, capsys, monkeypatch):
     manifest, _, result_paths = _load_complete_case(tmp_path)
     manifest_path = Path(manifest.source_path)
     comparison_path = tmp_path / "comparison.json"
     attestation_path = tmp_path / "attestation.json"
-    code_audit_path = _write_json(tmp_path / "code-audit.json", _audit_value("code"))
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
+    code_audit_path = _write_json(
+        tmp_path / "code-audit.json",
+        _audit_value("code", manifest.sha256, commit),
+    )
     theory_audit_path = _write_json(
-        tmp_path / "theory-audit.json", _audit_value("theory")
+        tmp_path / "theory-audit.json",
+        _audit_value("theory", manifest.sha256, commit),
     )
 
     assert (

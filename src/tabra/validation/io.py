@@ -168,7 +168,16 @@ def load_manifest(path: str | Path) -> CommandManifest:
     value = load_json_document(source)
     _require_keys(
         value,
-        {"schema_version", "command", "engines", "tolerances_frozen", "metrics"},
+        {
+            "schema_version",
+            "command",
+            "engines",
+            "tolerances_frozen",
+            "environment_requirements",
+            "supported_cases",
+            "data",
+            "metrics",
+        },
         "manifest",
     )
     schema_version = _validate_schema_version(value["schema_version"], "manifest")
@@ -186,6 +195,50 @@ def load_manifest(path: str | Path) -> CommandManifest:
 
     if value["tolerances_frozen"] is not True:
         raise SchemaError("manifest.tolerances_frozen must be true before any run")
+
+    supported_cases_value = value["supported_cases"]
+    if not isinstance(supported_cases_value, list) or not supported_cases_value:
+        raise SchemaError("manifest.supported_cases must be a non-empty list")
+    for case_id in supported_cases_value:
+        _validate_identifier(case_id, "manifest.supported_cases item")
+    if len(supported_cases_value) != len(set(supported_cases_value)):
+        raise SchemaError("manifest.supported_cases must not contain duplicates")
+
+    data_value = value["data"]
+    if not isinstance(data_value, dict):
+        raise SchemaError("manifest.data must be an object")
+    _require_keys(data_value, {"sha256"}, "manifest.data")
+    data_sha256 = _validate_sha256(data_value["sha256"], "manifest.data.sha256")
+
+    environment_requirements = value["environment_requirements"]
+    if not isinstance(environment_requirements, dict):
+        raise SchemaError("manifest.environment_requirements must be an object")
+    if set(environment_requirements) != REQUIRED_ENGINES:
+        raise SchemaError(
+            "manifest.environment_requirements must define python, stata, and r"
+        )
+    for engine, requirement in environment_requirements.items():
+        if not isinstance(requirement, dict):
+            raise SchemaError(
+                f"manifest.environment_requirements.{engine} must be an object"
+            )
+        version_key = "locked_version" if engine == "r" else "minimum_version"
+        _require_keys(
+            requirement,
+            {version_key},
+            f"manifest.environment_requirements.{engine}",
+        )
+        version_value = requirement[version_key]
+        if not isinstance(version_value, str) or not version_value.strip():
+            raise SchemaError(
+                f"manifest.environment_requirements.{engine}.{version_key} "
+                "must be a non-empty string"
+            )
+    r_lockfile = environment_requirements["r"].get("lockfile")
+    if not isinstance(r_lockfile, str) or not r_lockfile.strip():
+        raise SchemaError(
+            "manifest.environment_requirements.r.lockfile must be a non-empty path"
+        )
 
     metrics_value = value["metrics"]
     if not isinstance(metrics_value, dict) or not metrics_value:
@@ -225,6 +278,9 @@ def load_manifest(path: str | Path) -> CommandManifest:
         schema_version=schema_version,
         command=command,
         engines=tuple(engines_value),
+        supported_cases=tuple(supported_cases_value),
+        data_sha256=data_sha256,
+        environment_requirements=freeze_json(environment_requirements),
         metrics=tuple(metrics),
         tolerances_frozen=True,
         source_path=str(source),
@@ -303,6 +359,7 @@ def load_normalized_result(path: str | Path) -> NormalizedResult:
             "skipped",
             "sample",
             "metrics",
+            "metadata",
         },
         "normalized result",
     )
@@ -334,9 +391,30 @@ def load_normalized_result(path: str | Path) -> NormalizedResult:
     metrics = value["metrics"]
     if not isinstance(metrics, dict):
         raise SchemaError("result.metrics must be an object")
-    metadata = value.get("metadata", {})
+    metadata = value["metadata"]
     if not isinstance(metadata, dict):
         raise SchemaError("result.metadata must be an object")
+    _require_keys(
+        metadata,
+        {"engine_version", "dataset_path", "case_status"},
+        "result.metadata",
+    )
+    for field_name in ("engine_version", "dataset_path"):
+        field_value = metadata[field_name]
+        if not isinstance(field_value, str) or not field_value.strip():
+            raise SchemaError(
+                f"result.metadata.{field_name} must be a non-empty string"
+            )
+    case_status = metadata["case_status"]
+    allowed_case_status = {"completed", "failed", "skipped"}
+    if (
+        not isinstance(case_status, list)
+        or not case_status
+        or any(status not in allowed_case_status for status in case_status)
+    ):
+        raise SchemaError(
+            "result.metadata.case_status must be a non-empty list of valid statuses"
+        )
 
     return NormalizedResult(
         schema_version=schema_version,

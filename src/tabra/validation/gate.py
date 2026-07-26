@@ -6,9 +6,10 @@ import importlib.metadata
 import platform
 import subprocess
 import sys
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from .compare import compare_results
 from .io import sha256_json
@@ -21,6 +22,8 @@ def _audit_violations(
     kind: str,
     command: str,
     run_id: str,
+    manifest_sha256: str,
+    commit: str | None,
 ) -> list[dict[str, str]]:
     if audit is None:
         return [
@@ -30,11 +33,11 @@ def _audit_violations(
             }
         ]
     violations: list[dict[str, str]] = []
-    if audit.get("kind") != f"{kind}_audit":
+    if audit.get("schema_version") != 1:
         violations.append(
             {
-                "code": f"invalid_{kind}_audit_kind",
-                "message": f"Expected kind={kind}_audit",
+                "code": f"invalid_{kind}_audit_schema",
+                "message": f"The {kind} audit must use schema version 1",
             }
         )
     if audit.get("command") != command:
@@ -51,18 +54,50 @@ def _audit_violations(
                 "message": f"The {kind} audit is not from run {run_id}",
             }
         )
-    if audit.get("passed") is not True or audit.get("status") != "passed":
+    status_key = f"{kind}_audit_status"
+    if audit.get(status_key) != "PASS":
         violations.append(
             {
                 "code": f"{kind}_audit_not_passed",
-                "message": f"The {kind} audit did not pass",
+                "message": f"The {kind} audit does not declare {status_key}=PASS",
             }
         )
-    if audit.get("skipped") is True:
+
+    frozen_inputs = audit.get("frozen_inputs")
+    if not isinstance(frozen_inputs, dict):
         violations.append(
             {
-                "code": f"{kind}_audit_skipped",
-                "message": f"A skipped {kind} audit cannot pass the gate",
+                "code": f"invalid_{kind}_audit_frozen_inputs",
+                "message": f"The {kind} audit must identify its frozen inputs",
+            }
+        )
+        return violations
+    if frozen_inputs.get("manifest_sha256") != manifest_sha256:
+        violations.append(
+            {
+                "code": f"{kind}_audit_manifest_mismatch",
+                "message": f"The {kind} audit is bound to a different manifest",
+            }
+        )
+    audited_commits = [
+        value
+        for value in (audit.get("audited_commit"), frozen_inputs.get("commit"))
+        if isinstance(value, str) and value
+    ]
+    if not audited_commits:
+        violations.append(
+            {
+                "code": f"missing_{kind}_audit_commit",
+                "message": f"The {kind} audit does not identify its Git commit",
+            }
+        )
+    elif len(set(audited_commits)) != 1 or (
+        commit is not None and audited_commits[0] != commit
+    ):
+        violations.append(
+            {
+                "code": f"{kind}_audit_commit_mismatch",
+                "message": f"The {kind} audit is bound to a different Git commit",
             }
         )
     return violations
@@ -130,18 +165,27 @@ def evaluate_gate(
 ) -> dict[str, Any]:
     """Recompute comparison evidence and issue an attestation only on success."""
 
+    environment = collect_environment(workdir)
+    git_metadata = environment.get("git", {})
+    git_commit = git_metadata.get("commit")
+    if not isinstance(git_commit, str) or not git_commit:
+        git_commit = None
     audit_violations = [
         *_audit_violations(
             code_audit,
             kind="code",
             command=manifest.command,
             run_id=run_id,
+            manifest_sha256=manifest.sha256,
+            commit=git_commit,
         ),
         *_audit_violations(
             theory_audit,
             kind="theory",
             command=manifest.command,
             run_id=run_id,
+            manifest_sha256=manifest.sha256,
+            commit=git_commit,
         ),
     ]
     if audit_violations:
@@ -154,6 +198,49 @@ def evaluate_gate(
             "passed": False,
             "violations": audit_violations,
             "manifest_sha256": manifest.sha256,
+        }
+
+    if git_commit is None:
+        return {
+            "schema_version": 1,
+            "kind": "gate_decision",
+            "command": manifest.command,
+            "run_id": run_id,
+            "status": ValidationStatus.FAILED.value,
+            "passed": False,
+            "violations": [
+                {
+                    "code": "git_identity_unavailable",
+                    "message": (
+                        "A release attestation requires a verifiable Git commit "
+                        "identity"
+                    ),
+                }
+            ],
+            "manifest_sha256": manifest.sha256,
+            "environment": environment,
+        }
+
+    dirty = git_metadata.get("tracked_files_dirty")
+    if type(dirty) is not bool:
+        return {
+            "schema_version": 1,
+            "kind": "gate_decision",
+            "command": manifest.command,
+            "run_id": run_id,
+            "status": ValidationStatus.FAILED.value,
+            "passed": False,
+            "violations": [
+                {
+                    "code": "git_cleanliness_unavailable",
+                    "message": (
+                        "A release attestation requires a verifiable tracked "
+                        "worktree cleanliness status"
+                    ),
+                }
+            ],
+            "manifest_sha256": manifest.sha256,
+            "environment": environment,
         }
 
     recomputed = compare_results(manifest, results)
@@ -192,8 +279,6 @@ def evaluate_gate(
             "comparison_sha256": sha256_json(recomputed),
         }
 
-    environment = collect_environment(workdir)
-    dirty = environment["git"]["tracked_files_dirty"]
     if dirty is True and not allow_dirty:
         return {
             "schema_version": 1,
@@ -223,7 +308,7 @@ def evaluate_gate(
         "run_id": run_id,
         "status": "passed",
         "passed": True,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "manifest": {
             "path": manifest.source_path,
             "sha256": manifest.sha256,

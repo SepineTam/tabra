@@ -5,22 +5,23 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+import platform
 import sys
 from pathlib import Path
 
 import pandas as pd
 
-
 REG_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REG_DIRECTORY))
 
-from runner_common import (  # noqa: E402
+from runner_common import (
     load_case_specifications,
     make_document,
     verify_dataset,
     write_normalized_result,
 )
-from tabra.models.estimate.ols import OLS  # noqa: E402
+
+from tabra.models.estimate.ols import OLS
 
 
 def normalize_case(dataframe: pd.DataFrame, case_specification: dict) -> dict:
@@ -82,12 +83,13 @@ def main() -> int:
         engine_version = "source-tree"
     document = make_document(
         engine_name="python",
-        engine_version=engine_version,
+        engine_version=platform.python_version(),
         dataset_path=arguments.data,
         dataset_sha256=dataset_sha256,
         n_rows=n_rows,
         cases=cases,
     )
+    document["metadata"]["tabra_version"] = engine_version
     write_normalized_result(arguments.output, document)
     return 0
 

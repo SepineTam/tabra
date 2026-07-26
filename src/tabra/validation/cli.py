@@ -8,8 +8,9 @@ import os
 import shlex
 import shutil
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from .compare import compare_results
 from .errors import ValidationError

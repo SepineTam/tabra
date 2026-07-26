@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping, Sequence
 from itertools import combinations
 from numbers import Real
@@ -16,6 +17,8 @@ from .models import (
     ToleranceSpec,
     thaw_json,
 )
+
+_VERSION_NUMBER = re.compile(r"(?<!\d)(\d+(?:\.\d+)*)")
 
 
 def _violation(
@@ -135,6 +138,32 @@ def _tolerance_json(tolerance: ToleranceSpec) -> dict[str, Any]:
     return {"atol": tolerance.atol, "rtol": tolerance.rtol}
 
 
+def _version_tuple(value: str) -> tuple[int, ...] | None:
+    match = _VERSION_NUMBER.search(value)
+    if match is None:
+        return None
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _version_satisfies_requirement(
+    actual_version: str,
+    requirement: Mapping[str, Any],
+) -> bool:
+    actual = _version_tuple(actual_version)
+    if actual is None:
+        return False
+    if "locked_version" in requirement:
+        expected = _version_tuple(str(requirement["locked_version"]))
+        return actual == expected
+    minimum = _version_tuple(str(requirement["minimum_version"]))
+    if minimum is None:
+        return False
+    width = max(len(actual), len(minimum))
+    return actual + (0,) * (width - len(actual)) >= minimum + (0,) * (
+        width - len(minimum)
+    )
+
+
 def compare_results(
     manifest: CommandManifest,
     results: Sequence[NormalizedResult],
@@ -215,6 +244,46 @@ def compare_results(
                 _violation(
                     "empty_sample",
                     "The estimation sample must contain at least one observation",
+                    engine=engine,
+                )
+            )
+        if result.data_sha256 != manifest.data_sha256:
+            violations.append(
+                _violation(
+                    "dataset_hash_mismatch",
+                    "The engine result does not use the dataset frozen by the manifest",
+                    engine=engine,
+                )
+            )
+        case_ids = result.metrics.get("case_ids")
+        if case_ids != manifest.supported_cases:
+            violations.append(
+                _violation(
+                    "required_case_mismatch",
+                    "The engine result does not contain the frozen required case set",
+                    engine=engine,
+                    metric="case_ids",
+                )
+            )
+        case_status = result.metadata["case_status"]
+        if (
+            len(case_status) != len(manifest.supported_cases)
+            or any(status != "completed" for status in case_status)
+        ):
+            violations.append(
+                _violation(
+                    "case_status_mismatch",
+                    "Every frozen case must have one completed status",
+                    engine=engine,
+                )
+            )
+        engine_version = str(result.metadata["engine_version"])
+        requirement = manifest.environment_requirements[engine]
+        if not _version_satisfies_requirement(engine_version, requirement):
+            violations.append(
+                _violation(
+                    "engine_version_mismatch",
+                    f"Engine version {engine_version!r} violates the frozen requirement",
                     engine=engine,
                 )
             )
