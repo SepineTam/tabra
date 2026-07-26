@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "specification_version": "2.0.1",
+  "specification_version": "2.0.2",
   "command": "reg",
   "public_api": "TabraData.est.reg(y, x, is_con=True)",
   "implementation": "src/tabra/models/estimate/ols.py::OLS.fit",
@@ -145,7 +145,7 @@
       "citation": "Lai, T. L. and Xing, H. (2008), Statistical Models and Methods for Financial Markets, Springer Texts in Statistics",
       "doi": "10.1007/978-0-387-77827-3",
       "url": "https://link.springer.com/book/10.1007/978-0-387-77827-3",
-      "exact_locations": "p. 4 eq. (1.2); p. 5 eqs. (1.4)-(1.5) and following RSS definition; p. 7 eqs. (1.9)-(1.10); pp. 8-10 eqs. (1.11)-(1.14) and (1.22); pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1; pp. 13-14 eqs. (1.27)-(1.28)"
+      "exact_locations": "p. 4 eq. (1.2); p. 5 eqs. (1.4)-(1.5) and following RSS definition; p. 7 eqs. (1.9)-(1.10); p. 8 eq. (1.15); pp. 8-10 eqs. (1.11)-(1.14) and (1.22); pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1; pp. 13-14 eqs. (1.27)-(1.28)"
     },
     {
       "id": "fisher-1922",

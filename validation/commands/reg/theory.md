@@ -136,6 +136,25 @@ t_j=\frac{\hat\beta_j}{se_j},
 p_j=2\Pr\{T_{N-k}\ge |t_j|\}.
 \]
 
+The public two-sided 95% coefficient confidence interval is
+
+\[
+CI_{0.95}(\beta_j)=
+[\hat\beta_j-t_{0.975,N-k}se_j,\
+ \hat\beta_j+t_{0.975,N-k}se_j].
+\]
+
+Lai and Xing (2008), p. 8, equation (1.15), is the mathematical source for
+this interval. The parameterization uses $\alpha=0.05$ with 0.025 in each
+tail. The fitted constant, when present, is included in $k$, so both constant
+conventions use $N-k$ residual degrees of freedom. `[R] regress`, p. 26,
+supplies this software-compatibility parameterization. The interval requires
+full column rank, $N>k$, $se_j>0$, and the conventional homoskedastic spherical
+covariance assumptions above; exact finite-sample 95% coverage additionally
+requires $u\mid X\sim N(0,\sigma^2 I_N)$. Robust and cluster intervals are
+outside the supported scope. The public summary's three decimal places are
+display precision, not internal estimation precision.
+
 The overall test is $H_0:\beta_j=0$ for every nonconstant coefficient when
 $c=1$, and for all $k$ coefficients when $c=0$. Its normalized p-value is
 
@@ -207,7 +226,7 @@ the frozen `basic` and `no_constant` cases do not exercise degenerate designs.
   <https://doi.org/10.1007/978-0-387-77827-3>. The formula map uses the printed
   book pages and equations: p. 4, equation (1.2); p. 5, equations (1.4)--(1.5)
   and the following RSS definition; p. 7, equations (1.9)--(1.10); pp. 8--10,
-  equations (1.11)--(1.14) and (1.22); pp. 10--12, equations (1.23)--(1.25)
+  equations (1.11)--(1.15) and (1.22); pp. 10--12, equations (1.23)--(1.25)
   and Table 1.1; and pp. 13--14, equations (1.27)--(1.28).
 
 ### Original historical sources
