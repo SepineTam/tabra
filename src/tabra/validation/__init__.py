@@ -1,6 +1,6 @@
 """Scientific validation infrastructure for Tabra commands."""
 
-from .compare import compare_results
+from .compare import check_comparison_integrity, compare_results
 from .errors import SchemaError, StateTransitionError, ValidationError
 from .gate import collect_environment, evaluate_gate
 from .io import (
@@ -35,6 +35,7 @@ __all__ = [
     "ValidationError",
     "ValidationRegistry",
     "ValidationStatus",
+    "check_comparison_integrity",
     "collect_environment",
     "compare_results",
     "evaluate_gate",

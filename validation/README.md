@@ -43,6 +43,28 @@ uv run tabra-validate compare \
   --output validation/runs/reg/<run_id>/comparison.json
 ```
 
+`comparison.json` is canonical machine evidence created only by this command.
+The CLI refuses to overwrite it; reviewers must treat it as immutable and write
+all status, environment, audit, explanation, and repair notes to
+`comparison.md`.
+
+Before entering the final Gate, verify that the stored JSON is exactly the
+complete object recomputed by the product comparator:
+
+```bash
+uv run tabra-validate check-comparison \
+  --manifest validation/commands/reg/manifest.yaml \
+  --comparison validation/runs/reg/<run_id>/comparison.json \
+  --result validation/runs/reg/<run_id>/python/results.json \
+  --result validation/runs/reg/<run_id>/stata/results.json \
+  --result validation/runs/reg/<run_id>/r/results.json \
+  --output validation/runs/reg/<run_id>/comparison-check.json
+```
+
+The check returns a nonzero status if any field differs or the scientific
+comparison fails. In that case, retain the failed run, do not call the Gate, and
+start a new run ID after repair.
+
 The gate additionally requires `--run-id`, `--code-audit`, and
 `--theory-audit`. Its output path is immutable: an existing attestation is never
 overwritten, even by an error report.

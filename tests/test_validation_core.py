@@ -405,6 +405,8 @@ def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
     assert all(case["passed"] for case in report["case_evidence"]["cases"])
     assert all(metric["passed"] for metric in report["metrics"])
     assert len(report["metrics"][1]["pairs"]) == 3
+    assert "comparison_status" not in report
+    assert "reporter_checks" not in report
 
 
 def test_comparison_rejects_shared_wrong_dataset(tmp_path):
@@ -695,6 +697,57 @@ def test_gate_rejects_edited_or_stale_comparison(tmp_path, monkeypatch):
     assert decision["violations"][0]["code"] == "comparison_report_mismatch"
 
 
+@pytest.mark.parametrize(
+    ("field_name", "field_value"),
+    [("comparison_status", "PASS"), ("reporter_checks", {"reviewed": True})],
+)
+def test_check_comparison_rejects_reporter_extensions_and_matches_gate(
+    tmp_path, capsys, monkeypatch, field_name, field_value
+):
+    manifest, results, result_paths = _load_complete_case(tmp_path)
+    comparison = compare_results(manifest, results)
+    comparison[field_name] = field_value
+    comparison_path = _write_json(tmp_path / "comparison.json", comparison)
+    check_output_path = tmp_path / "comparison-check.json"
+    check_args = [
+        "check-comparison",
+        "--manifest",
+        manifest.source_path,
+        "--comparison",
+        str(comparison_path),
+    ]
+    for result_path in result_paths:
+        check_args.extend(["--result", str(result_path)])
+    check_args.extend(["--output", str(check_output_path)])
+
+    assert main(check_args) == 1
+    check_report = json.loads(check_output_path.read_text(encoding="utf-8"))
+    assert check_report["canonical_match"] is False
+    assert check_report["passed"] is False
+    assert check_report["violations"][0]["code"] == "comparison_report_mismatch"
+
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
+    gate_report = evaluate_gate(
+        manifest,
+        results,
+        comparison,
+        run_id="test-run",
+        code_audit=_audit_value("code", manifest.sha256, commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
+        workdir=tmp_path,
+    )
+
+    assert gate_report["violations"][0]["code"] == "comparison_report_mismatch"
+    assert check_report["supplied_comparison_sha256"] == gate_report[
+        "supplied_comparison_sha256"
+    ]
+    assert check_report["recomputed_comparison_sha256"] == gate_report[
+        "recomputed_comparison_sha256"
+    ]
+    assert capsys.readouterr().out == ""
+
+
 def test_gate_requires_both_independent_audits(tmp_path):
     manifest, results, _ = _load_complete_case(tmp_path)
     comparison = compare_results(manifest, results)
@@ -872,6 +925,54 @@ def test_gate_cli_never_overwrites_existing_evidence(tmp_path, capsys):
     assert main(argv) == 2
     assert json.loads(output_path.read_text(encoding="utf-8")) == {"keep": True}
     assert "Refusing to overwrite immutable gate output" in capsys.readouterr().out
+
+
+def test_compare_cli_never_overwrites_existing_evidence(tmp_path, capsys):
+    manifest, _, result_paths = _load_complete_case(tmp_path)
+    output_path = _write_json(tmp_path / "comparison.json", {"keep": True})
+    original_bytes = output_path.read_bytes()
+    args = ["compare", "--manifest", manifest.source_path]
+    for result_path in result_paths:
+        args.extend(["--result", str(result_path)])
+    args.extend(["--output", str(output_path)])
+
+    assert main(args) == 2
+    assert output_path.read_bytes() == original_bytes
+    assert "Refusing to overwrite immutable comparison output" in (
+        capsys.readouterr().out
+    )
+
+
+def test_check_comparison_accepts_exact_cli_artifact(tmp_path):
+    manifest, _, result_paths = _load_complete_case(tmp_path)
+    comparison_path = tmp_path / "comparison.json"
+    check_output_path = tmp_path / "comparison-check.json"
+    compare_args = ["compare", "--manifest", manifest.source_path]
+    for result_path in result_paths:
+        compare_args.extend(["--result", str(result_path)])
+    compare_args.extend(["--output", str(comparison_path)])
+    assert main(compare_args) == 0
+
+    check_args = [
+        "check-comparison",
+        "--manifest",
+        manifest.source_path,
+        "--comparison",
+        str(comparison_path),
+    ]
+    for result_path in result_paths:
+        check_args.extend(["--result", str(result_path)])
+    check_args.extend(["--output", str(check_output_path)])
+
+    assert main(check_args) == 0
+    report = json.loads(check_output_path.read_text(encoding="utf-8"))
+    assert report["kind"] == "comparison_integrity_check"
+    assert report["canonical_match"] is True
+    assert report["scientific_passed"] is True
+    assert report["passed"] is True
+    assert report["supplied_comparison_sha256"] == report[
+        "recomputed_comparison_sha256"
+    ]
 
 
 def test_cli_preflight_compare_and_gate(tmp_path, capsys, monkeypatch):

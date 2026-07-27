@@ -9,6 +9,7 @@ from itertools import combinations
 from numbers import Real
 from typing import Any
 
+from .io import sha256_json
 from .models import (
     CommandManifest,
     EngineRunStatus,
@@ -583,3 +584,38 @@ def compare_results(
         ),
     }
     return report
+
+
+def check_comparison_integrity(
+    manifest: CommandManifest,
+    results: Sequence[NormalizedResult],
+    supplied_comparison: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    recomputed = compare_results(manifest, results)
+    canonical_match = supplied_comparison == recomputed
+    scientific_passed = recomputed["passed"] is True
+    if not canonical_match:
+        violations = [
+            {
+                "code": "comparison_report_mismatch",
+                "message": (
+                    "The stored comparison is stale or edited; regenerate it "
+                    "from the current manifest and normalized results"
+                ),
+            }
+        ]
+    else:
+        violations = recomputed["violations"]
+    report = {
+        "schema_version": 1,
+        "kind": "comparison_integrity_check",
+        "command": manifest.command,
+        "manifest_sha256": manifest.sha256,
+        "canonical_match": canonical_match,
+        "scientific_passed": scientific_passed,
+        "passed": canonical_match and scientific_passed,
+        "supplied_comparison_sha256": sha256_json(supplied_comparison),
+        "recomputed_comparison_sha256": sha256_json(recomputed),
+        "violations": violations,
+    }
+    return report, recomputed
