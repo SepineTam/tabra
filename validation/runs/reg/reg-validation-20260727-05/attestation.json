@@ -1,0 +1,62 @@
+{
+  "attestation_sha256": "0ff3c9915a751e93f0b9f7ef3fc11974fb34ee2f63dc616d145d1ede758194f9",
+  "audits": {
+    "code": {
+      "sha256": "9c925f3f8bcc9003b0139554af3e5aaaf7f8f15804a4593afdcd879c22c2bd46"
+    },
+    "theory": {
+      "sha256": "115a5b07ee0e3f6f54af4e89a6e572d6932aed4104b07bdc5055ed53a5df53d3"
+    }
+  },
+  "command": "reg",
+  "comparison_sha256": "2f71427d97e4fa94ecd449b6ebba5e4a749093d32bec200647a3d5a05f6f343f",
+  "dirty_worktree_authorized": false,
+  "environment": {
+    "distributions": {
+      "numpy": "2.4.3",
+      "pandas": "3.0.1",
+      "scipy": "1.17.1",
+      "statsmodels": "0.14.6",
+      "tabra": "0.1.0"
+    },
+    "git": {
+      "commit": "9ce5b597d9e3a2d7b3168262519b2be3019116e9",
+      "tracked_files_dirty": false
+    },
+    "platform": {
+      "machine": "arm64",
+      "release": "25.3.0",
+      "system": "Darwin"
+    },
+    "python": {
+      "executable": "/Users/sepinetam/Documents/Github/tabra/.venv/bin/python3",
+      "implementation": "CPython",
+      "version": "3.11.11"
+    }
+  },
+  "generated_at": "2026-07-27T06:36:37.786980+00:00",
+  "kind": "validation_attestation",
+  "manifest": {
+    "path": "/Users/sepinetam/Documents/Github/tabra/validation/commands/reg/manifest.yaml",
+    "sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+    "tolerances_frozen": true
+  },
+  "normalized_results": {
+    "python": {
+      "path": "/Users/sepinetam/Documents/Github/tabra/validation/runs/reg/reg-validation-20260727-05/python/results.json",
+      "sha256": "33488e61673c56eaede753dd3588d6fdb21504a79366a02a4d983e80d937945a"
+    },
+    "r": {
+      "path": "/Users/sepinetam/Documents/Github/tabra/validation/runs/reg/reg-validation-20260727-05/r/results.json",
+      "sha256": "93dd1dba7643ae9dd765ac2913b748ec64fe365e324d58740aa9f2caaff343c2"
+    },
+    "stata": {
+      "path": "/Users/sepinetam/Documents/Github/tabra/validation/runs/reg/reg-validation-20260727-05/stata/results.json",
+      "sha256": "4ba938a20b66e19adcb385024d19b60489801e86d2b43b321a8d8d9f67029b3a"
+    }
+  },
+  "passed": true,
+  "run_id": "reg-validation-20260727-05",
+  "schema_version": 1,
+  "status": "passed"
+}

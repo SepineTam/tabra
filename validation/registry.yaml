@@ -6,7 +6,9 @@
       "enabled": true,
       "priority": 10,
       "stage": "pilot",
-      "latest_attestation": null
+      "latest_run": "reg-validation-20260727-05",
+      "latest_status": "PASSED",
+      "latest_attestation": "runs/reg/reg-validation-20260727-05/attestation.json"
     }
   }
 }

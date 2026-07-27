@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260727-05",
+  "engine": "r",
+  "engine_version": "R version 4.4.1 (2024-06-14)",
+  "tabra_commit": "9ce5b597d9e3a2d7b3168262519b2be3019116e9",
+  "manifest_sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+  "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+  "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+  "result_sha256": "93dd1dba7643ae9dd765ac2913b748ec64fe365e324d58740aa9f2caaff343c2",
+  "executable": "/usr/local/bin/Rscript",
+  "lockfile": "validation/commands/reg/r/renv.lock",
+  "lockfile_sha256": "5e87bfe5d7471992ad8966cdc8c849ea8ad82417e8d870e7e35daa558c7777e2",
+  "locked_r_version": "4.4.1",
+  "package_versions": {
+    "base": "4.4.1",
+    "stats": "4.4.1",
+    "utils": "4.4.1",
+    "compiler": "4.4.1"
+  },
+  "platform": "aarch64-apple-darwin20",
+  "operating_system": "macOS 26.3",
+  "blas": "/Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRblas.0.dylib",
+  "lapack": "/Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlapack.dylib; LAPACK version 3.12.0",
+  "locale": "C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8",
+  "time_zone": "Asia/Shanghai",
+  "engine_mappings": [
+    {
+      "case_id": "basic",
+      "function": "stats::lm",
+      "formula": "y ~ x1 + x2",
+      "covariance": "homoskedastic"
+    },
+    {
+      "case_id": "no_constant",
+      "function": "stats::lm",
+      "formula": "y ~ x1 + x2 - 1",
+      "covariance": "homoskedastic"
+    }
+  ],
+  "cases_executed": 2,
+  "cases_skipped": 0,
+  "elapsed_seconds": 0.25,
+  "warnings": [],
+  "captured_at": "2026-07-27T06:23:01Z"
+}
