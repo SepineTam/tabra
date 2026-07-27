@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-03",
+  "engine": "stata",
+  "engine_version": "19.5",
+  "tabra_commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+  "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+  "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+  "result_sha256": "3f51adfbd99b639bd6aad78b74cb1469aa3f9e6db5a731d69a7c95c3618509e1",
+  "executable": "/usr/local/bin/stata-mp"
+}

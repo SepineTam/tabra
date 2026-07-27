@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .compare import compare_results
+from .compare import check_comparison_integrity
 from .io import sha256_json
 from .models import CommandManifest, NormalizedResult, ValidationStatus
 
@@ -243,8 +243,8 @@ def evaluate_gate(
             "environment": environment,
         }
 
-    recomputed = compare_results(manifest, results)
-    if comparison != recomputed:
+    integrity, recomputed = check_comparison_integrity(manifest, results, comparison)
+    if not integrity["canonical_match"]:
         return {
             "schema_version": 1,
             "kind": "gate_decision",
@@ -252,21 +252,17 @@ def evaluate_gate(
             "run_id": run_id,
             "status": ValidationStatus.FAILED.value,
             "passed": False,
-            "violations": [
-                {
-                    "code": "comparison_report_mismatch",
-                    "message": (
-                        "The stored comparison is stale or edited; regenerate it "
-                        "from the current manifest and normalized results"
-                    ),
-                }
-            ],
+            "violations": integrity["violations"],
             "manifest_sha256": manifest.sha256,
-            "supplied_comparison_sha256": sha256_json(comparison),
-            "recomputed_comparison_sha256": sha256_json(recomputed),
+            "supplied_comparison_sha256": integrity[
+                "supplied_comparison_sha256"
+            ],
+            "recomputed_comparison_sha256": integrity[
+                "recomputed_comparison_sha256"
+            ],
         }
 
-    if not recomputed["passed"]:
+    if not integrity["scientific_passed"]:
         return {
             "schema_version": 1,
             "kind": "gate_decision",
@@ -274,7 +270,7 @@ def evaluate_gate(
             "run_id": run_id,
             "status": ValidationStatus.FAILED.value,
             "passed": False,
-            "violations": recomputed["violations"],
+            "violations": integrity["violations"],
             "manifest_sha256": manifest.sha256,
             "comparison_sha256": sha256_json(recomputed),
         }

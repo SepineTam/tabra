@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,9 @@ from .models import (
     freeze_json,
 )
 
-SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 1
+REGISTRY_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
 REQUIRED_ENGINES = frozenset({"python", "stata", "r"})
 _IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]*$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -116,10 +119,10 @@ def _require_keys(value: dict[str, Any], keys: set[str], context: str) -> None:
         raise SchemaError(f"{context} is missing required keys: {', '.join(missing)}")
 
 
-def _validate_schema_version(value: Any, context: str) -> int:
-    if type(value) is not int or value != SCHEMA_VERSION:
+def _validate_schema_version(value: Any, context: str, expected: int) -> int:
+    if type(value) is not int or value != expected:
         raise SchemaError(
-            f"{context}.schema_version must be the integer {SCHEMA_VERSION}"
+            f"{context}.schema_version must be the integer {expected}"
         )
     return value
 
@@ -175,12 +178,15 @@ def load_manifest(path: str | Path) -> CommandManifest:
             "tolerances_frozen",
             "environment_requirements",
             "supported_cases",
+            "cases",
             "data",
             "metrics",
         },
         "manifest",
     )
-    schema_version = _validate_schema_version(value["schema_version"], "manifest")
+    schema_version = _validate_schema_version(
+        value["schema_version"], "manifest", MANIFEST_SCHEMA_VERSION
+    )
     command = _validate_identifier(value["command"], "manifest.command")
 
     engines_value = value["engines"]
@@ -204,11 +210,25 @@ def load_manifest(path: str | Path) -> CommandManifest:
     if len(supported_cases_value) != len(set(supported_cases_value)):
         raise SchemaError("manifest.supported_cases must not contain duplicates")
 
+    cases_value = value["cases"]
+    if not isinstance(cases_value, dict):
+        raise SchemaError("manifest.cases must be an object")
+    _require_keys(cases_value, {"path", "sha256"}, "manifest.cases")
+    cases_path = cases_value["path"]
+    if not isinstance(cases_path, str) or not cases_path.strip():
+        raise SchemaError("manifest.cases.path must be a non-empty path")
+    cases_sha256 = _validate_sha256(
+        cases_value["sha256"], "manifest.cases.sha256"
+    )
+
     data_value = value["data"]
     if not isinstance(data_value, dict):
         raise SchemaError("manifest.data must be an object")
-    _require_keys(data_value, {"sha256"}, "manifest.data")
+    _require_keys(data_value, {"sha256", "seed"}, "manifest.data")
     data_sha256 = _validate_sha256(data_value["sha256"], "manifest.data.sha256")
+    seed = data_value["seed"]
+    if type(seed) is not int:
+        raise SchemaError("manifest.data.seed must be an integer")
 
     environment_requirements = value["environment_requirements"]
     if not isinstance(environment_requirements, dict):
@@ -279,6 +299,8 @@ def load_manifest(path: str | Path) -> CommandManifest:
         command=command,
         engines=tuple(engines_value),
         supported_cases=tuple(supported_cases_value),
+        cases_sha256=cases_sha256,
+        seed=seed,
         data_sha256=data_sha256,
         environment_requirements=freeze_json(environment_requirements),
         metrics=tuple(metrics),
@@ -294,7 +316,9 @@ def load_registry(path: str | Path) -> ValidationRegistry:
     source = Path(path).resolve()
     value = load_json_document(source)
     _require_keys(value, {"schema_version", "commands"}, "registry")
-    schema_version = _validate_schema_version(value["schema_version"], "registry")
+    schema_version = _validate_schema_version(
+        value["schema_version"], "registry", REGISTRY_SCHEMA_VERSION
+    )
     commands = value["commands"]
     if not isinstance(commands, dict) or not commands:
         raise SchemaError("registry.commands must be a non-empty object")
@@ -363,7 +387,9 @@ def load_normalized_result(path: str | Path) -> NormalizedResult:
         },
         "normalized result",
     )
-    schema_version = _validate_schema_version(value["schema_version"], "result")
+    schema_version = _validate_schema_version(
+        value["schema_version"], "result", RESULT_SCHEMA_VERSION
+    )
     command = _validate_identifier(value["command"], "result.command")
     engine = value["engine"]
     if engine not in REQUIRED_ENGINES:
@@ -396,7 +422,13 @@ def load_normalized_result(path: str | Path) -> NormalizedResult:
         raise SchemaError("result.metadata must be an object")
     _require_keys(
         metadata,
-        {"engine_version", "dataset_path", "case_status"},
+        {
+            "engine_version",
+            "dataset_path",
+            "case_status",
+            "cases_sha256",
+            "case_execution",
+        },
         "result.metadata",
     )
     for field_name in ("engine_version", "dataset_path"):
@@ -415,6 +447,56 @@ def load_normalized_result(path: str | Path) -> NormalizedResult:
         raise SchemaError(
             "result.metadata.case_status must be a non-empty list of valid statuses"
         )
+    cases_sha256 = _validate_sha256(
+        metadata["cases_sha256"], "result.metadata.cases_sha256"
+    )
+    case_execution_value = metadata["case_execution"]
+    if not isinstance(case_execution_value, list) or not case_execution_value:
+        raise SchemaError("result.metadata.case_execution must be a non-empty list")
+    case_execution: list[Mapping[str, Any]] = []
+    case_ids: list[str] = []
+    required_evidence = {
+        "case_id",
+        "seed",
+        "included_row_sha256",
+        "omitted_parameters",
+    }
+    for index, case_value in enumerate(case_execution_value):
+        context = f"result.metadata.case_execution[{index}]"
+        if not isinstance(case_value, dict):
+            raise SchemaError(f"{context} must be an object")
+        _require_keys(case_value, required_evidence, context)
+        case_id = _validate_identifier(case_value["case_id"], f"{context}.case_id")
+        seed = case_value["seed"]
+        if type(seed) is not int:
+            raise SchemaError(f"{context}.seed must be an integer")
+        _validate_sha256(
+            case_value["included_row_sha256"],
+            f"{context}.included_row_sha256",
+        )
+        omitted_parameters = case_value["omitted_parameters"]
+        if (
+            not isinstance(omitted_parameters, list)
+            or any(
+                not isinstance(parameter, str) or not parameter
+                for parameter in omitted_parameters
+            )
+            or len(omitted_parameters) != len(set(omitted_parameters))
+        ):
+            raise SchemaError(
+                f"{context}.omitted_parameters must contain unique non-empty strings"
+            )
+        case_ids.append(case_id)
+        case_execution.append(freeze_json(case_value))
+    metric_case_ids = metrics.get("case_ids")
+    if (
+        not isinstance(metric_case_ids, list)
+        or case_ids != metric_case_ids
+        or len(case_ids) != len(set(case_ids))
+    ):
+        raise SchemaError(
+            "result.metadata.case_execution case IDs must exactly match metrics.case_ids"
+        )
 
     return NormalizedResult(
         schema_version=schema_version,
@@ -425,6 +507,8 @@ def load_normalized_result(path: str | Path) -> NormalizedResult:
         skipped=value["skipped"],
         nobs=nobs,
         data_sha256=data_sha256,
+        cases_sha256=cases_sha256,
+        case_execution=tuple(case_execution),
         metrics=freeze_json(metrics),
         metadata=freeze_json(metadata),
         source_path=str(source),

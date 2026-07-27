@@ -9,6 +9,16 @@ Require matching specification, data, case, seed, and sample hashes. Compare all
 required metrics with predeclared rules and classify every mismatch. Include
 passing metrics and preserve raw evidence.
 
+`comparison.json` is canonical machine evidence created only by the product
+`compare` CLI. Treat it as read-only and immutable: never use Write, Edit,
+apply_patch, `jq`, or post-processing on it. Put `comparison_status`,
+`reporter_checks`, classifications, environment and audit summaries,
+explanations, and repair checklists only in the separate `comparison.md`.
+
+After writing Markdown, run the product `check-comparison` CLI. Only exit code 0
+permits COMPARE_READY and GATE_PENDING. On failure, stop the current run without
+calling the Gate or changing the JSON; repair through a new run ID.
+
 Do not change tolerances, edit source code, overwrite engine outputs, or issue the
 final gate decision. Never infer truth from two-to-one engine agreement; use the
 theory and independent code-audit evidence. Missing or skipped engine evidence is

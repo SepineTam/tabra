@@ -1,0 +1,191 @@
+{
+  "command": "reg",
+  "converged": true,
+  "engine": "r",
+  "metadata": {
+    "case_status": [
+      "completed",
+      "completed"
+    ],
+    "case_execution": [
+      {
+        "case_id": "basic",
+        "convergence_code": 0,
+        "convergence_state": "closed_form_completed",
+        "covariance": "homoskedastic",
+        "error_details": null,
+        "formula": "y ~ x1 + x2",
+        "included_nobs": 120,
+        "included_row_sha256": "11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76",
+        "missing_metrics": [],
+        "omitted_parameters": [],
+        "r_function": "stats::lm",
+        "rank": 3,
+        "seed": 20260722,
+        "warnings": []
+      },
+      {
+        "case_id": "no_constant",
+        "convergence_code": 0,
+        "convergence_state": "closed_form_completed",
+        "covariance": "homoskedastic",
+        "error_details": null,
+        "formula": "y ~ x1 + x2 - 1",
+        "included_nobs": 120,
+        "included_row_sha256": "11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76",
+        "missing_metrics": [],
+        "omitted_parameters": [],
+        "r_function": "stats::lm",
+        "rank": 2,
+        "seed": 20260722,
+        "warnings": []
+      }
+    ],
+    "dataset_path": "/Users/sepinetam/Documents/Github/tabra/validation/commands/reg/data/reg_fixture.csv",
+    "elapsed_seconds": 0.087810833,
+    "engine_version": "R version 4.4.1 (2024-06-14)",
+    "included_row_hash_canonicalization": "UTF-8 row_id values in dataset order, one per line with a trailing newline",
+    "run_warnings": []
+  },
+  "metrics": {
+    "case_ids": [
+      "basic",
+      "no_constant"
+    ],
+    "coefficients": [
+      [
+        2.40695210637742,
+        -0.820063125982304,
+        1.68129015293938
+      ],
+      [
+        2.29831860556729,
+        -0.82061197759208
+      ]
+    ],
+    "covariance": [
+      [
+        [
+          0.0014077528824068082,
+          -0.00039684018417148029,
+          0.000079732863221130035
+        ],
+        [
+          -0.00039684018417148029,
+          0.0018026569141922836,
+          4.028362338010998e-7
+        ],
+        [
+          0.000079732863221130035,
+          4.028362338010998e-7,
+          0.0012340031095346951
+        ]
+      ],
+      [
+        [
+          0.028619059908906001,
+          -0.0080977677892660454
+        ],
+        [
+          -0.0080977677892660454,
+          0.036781906755437091
+        ]
+      ]
+    ],
+    "df_model": [
+      2,
+      2
+    ],
+    "df_resid": [
+      117,
+      118
+    ],
+    "f_p_value": [
+      5.79049378686107e-92,
+      6.32494003415425e-25
+    ],
+    "f_stat": [
+      2063.60840381617,
+      92.7062935376451
+    ],
+    "nobs": [
+      120,
+      120
+    ],
+    "p_values": [
+      [
+        5.08928961927799e-93,
+        3.42123905586929e-38,
+        1.1031530193039e-78
+      ],
+      [
+        6.95496656312169e-26,
+        3.8410727594931e-05
+      ]
+    ],
+    "parameter_names": [
+      [
+        "x1",
+        "x2",
+        "_cons"
+      ],
+      [
+        "x1",
+        "x2"
+      ]
+    ],
+    "r_squared": [
+      0.972433076512585,
+      0.611090623703364
+    ],
+    "r_squared_adj": [
+      0.971961847051262,
+      0.604498939359353
+    ],
+    "root_mse": [
+      0.384058991353613,
+      1.73483642877253
+    ],
+    "ss_model": [
+      608.769880990377,
+      558.028371158866
+    ],
+    "ss_residual": [
+      17.2576531342279,
+      355.139577282354
+    ],
+    "ss_total": [
+      626.027534124605,
+      913.16794844122
+    ],
+    "standard_errors": [
+      [
+        0.0375200330810996,
+        0.0424577073591154,
+        0.035128380400108
+      ],
+      [
+        0.169171687669379,
+        0.191786096355907
+      ]
+    ],
+    "test_statistics": [
+      [
+        64.151118981553,
+        -19.3148235500813,
+        47.8613056961262
+      ],
+      [
+        13.5857166008712,
+        -4.27878763468459
+      ]
+    ]
+  },
+  "sample": {
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "nobs": 120
+  },
+  "schema_version": 1,
+  "skipped": false,
+  "status": "completed"
+}

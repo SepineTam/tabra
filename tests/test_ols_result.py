@@ -10,6 +10,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 
 @pytest.fixture
@@ -158,6 +159,49 @@ class TestAnovaAlignment:
         assert no_constant_ms == pytest.approx(
             without_constant.SST / len(data), abs=5e-7
         )
+
+
+class TestCoefficientConfidenceInterval:
+    @pytest.mark.parametrize("is_con", [True, False])
+    def test_95_percent_confidence_interval_uses_t_distribution(self, is_con):
+        from tabra.models.estimate.ols import OLS
+
+        response = np.array([1.1, 2.4, 2.8, 4.6, 4.9, 6.7])
+        predictor = np.array([0.5, 1.0, 1.8, 2.6, 3.5, 4.2])
+        data = pd.DataFrame({"y": response, "x": predictor})
+        design = predictor[:, np.newaxis]
+        parameter_names = ["x"]
+        if is_con:
+            design = np.column_stack([design, np.ones(len(data))])
+            parameter_names.append("_cons")
+
+        xtx_inverse = np.linalg.inv(design.T @ design)
+        coefficients = xtx_inverse @ design.T @ response
+        residuals = response - design @ coefficients
+        degrees_of_freedom = len(data) - design.shape[1]
+        residual_variance = residuals @ residuals / degrees_of_freedom
+        standard_errors = np.sqrt(np.diag(residual_variance * xtx_inverse))
+        critical_value = stats.t.ppf(0.975, degrees_of_freedom)
+        expected_lower = coefficients - critical_value * standard_errors
+        expected_upper = coefficients + critical_value * standard_errors
+
+        result = OLS().fit(data, y="y", x=["x"], is_con=is_con)
+        coefficient_rows = []
+        for line in result.summary().splitlines():
+            row_name = line.split("|", maxsplit=1)[0].strip()
+            if row_name in parameter_names:
+                fields = line.split()
+                coefficient_rows.append(
+                    (row_name, float(fields[-2]), float(fields[-1]))
+                )
+
+        assert [row[0] for row in coefficient_rows] == parameter_names
+        assert len(coefficient_rows) == len(parameter_names)
+        for row, lower, upper in zip(
+            coefficient_rows, expected_lower, expected_upper
+        ):
+            assert row[1] == pytest.approx(lower, abs=5e-4)
+            assert row[2] == pytest.approx(upper, abs=5e-4)
 
 
 class TestAnovaNoLeadingSpaces:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -25,6 +26,8 @@ from tabra.validation import (
 from tabra.validation.cli import main
 
 DATA_SHA256 = "a" * 64
+CASES_SHA256 = "b" * 64
+INCLUDED_ROW_SHA256 = "c" * 64
 ENGINE_VERSIONS = {
     "python": "3.11.11",
     "stata": "19.5",
@@ -50,7 +53,8 @@ def _manifest_value() -> dict[str, object]:
             "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"},
         },
         "supported_cases": ["basic", "no_constant"],
-        "data": {"sha256": DATA_SHA256},
+        "cases": {"path": "cases.yaml", "sha256": CASES_SHA256},
+        "data": {"sha256": DATA_SHA256, "seed": 20260722},
         "metrics": {
             "case_ids": {"tolerance": {"exact": True}},
             "nobs": {"tolerance": {"exact": True}},
@@ -70,7 +74,7 @@ def _result_value(
     metrics: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "command": "reg",
         "engine": engine,
         "status": status,
@@ -88,6 +92,16 @@ def _result_value(
             "engine_version": ENGINE_VERSIONS[engine],
             "dataset_path": "/frozen/reg_fixture.csv",
             "case_status": ["completed", "completed"],
+            "cases_sha256": CASES_SHA256,
+            "case_execution": [
+                {
+                    "case_id": case_id,
+                    "seed": 20260722,
+                    "included_row_sha256": INCLUDED_ROW_SHA256,
+                    "omitted_parameters": [],
+                }
+                for case_id in ("basic", "no_constant")
+            ],
         },
     }
 
@@ -213,6 +227,8 @@ def test_manifest_retains_frozen_data_cases_and_engine_requirements(tmp_path):
     manifest = load_manifest(manifest_path)
 
     assert manifest.data_sha256 == DATA_SHA256
+    assert manifest.cases_sha256 == CASES_SHA256
+    assert manifest.seed == 20260722
     assert manifest.supported_cases == ("basic", "no_constant")
     assert manifest.environment_requirements["r"]["locked_version"] == "4.4.1"
 
@@ -251,7 +267,7 @@ def test_registry_resolves_manifests_and_blocks_path_escape(tmp_path):
 def test_normalized_result_rejects_duplicate_keys_and_nonfinite_json(tmp_path):
     duplicate_path = tmp_path / "duplicate.json"
     duplicate_path.write_text(
-        '{"schema_version": 1, "schema_version": 1}', encoding="utf-8"
+        '{"schema_version": 2, "schema_version": 2}', encoding="utf-8"
     )
     with pytest.raises(SchemaError, match="Duplicate JSON key"):
         load_normalized_result(duplicate_path)
@@ -285,6 +301,98 @@ def test_normalized_result_requires_complete_metadata(tmp_path, metadata):
         load_normalized_result(result_path)
 
 
+def test_normalized_result_requires_v2_provenance_contract(tmp_path):
+    value = _result_value("python")
+    value["schema_version"] = 1
+    result_path = _write_json(tmp_path / "python.json", value)
+    with pytest.raises(SchemaError, match="schema_version"):
+        load_normalized_result(result_path)
+
+    for missing_field in ("cases_sha256", "case_execution"):
+        value = _result_value("python")
+        value["metadata"].pop(missing_field)
+        _write_json(result_path, value)
+        with pytest.raises(SchemaError, match=missing_field):
+            load_normalized_result(result_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value"),
+    [
+        ("cases_sha256", "not-a-hash"),
+        ("seed", True),
+        ("included_row_sha256", "not-a-hash"),
+        ("omitted_parameters", ["x1", "x1"]),
+        ("omitted_parameters", [1]),
+    ],
+)
+def test_normalized_result_rejects_invalid_provenance(
+    tmp_path, field, invalid_value
+):
+    value = _result_value("python")
+    if field == "cases_sha256":
+        value["metadata"][field] = invalid_value
+    else:
+        value["metadata"]["case_execution"][0][field] = invalid_value
+    result_path = _write_json(tmp_path / "python.json", value)
+
+    with pytest.raises(SchemaError, match=field):
+        load_normalized_result(result_path)
+
+
+@pytest.mark.parametrize(
+    "case_execution",
+    [
+        [],
+        [
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            }
+        ],
+        [
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+        ],
+        [
+            {
+                "case_id": "no_constant",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+            {
+                "case_id": "basic",
+                "seed": 20260722,
+                "included_row_sha256": INCLUDED_ROW_SHA256,
+                "omitted_parameters": [],
+            },
+        ],
+    ],
+)
+def test_normalized_result_rejects_incomplete_duplicate_or_reordered_execution(
+    tmp_path, case_execution
+):
+    value = _result_value("python")
+    value["metadata"]["case_execution"] = case_execution
+    result_path = _write_json(tmp_path / "python.json", value)
+
+    with pytest.raises(SchemaError, match="case_execution"):
+        load_normalized_result(result_path)
+
+
 def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
     manifest, results, _ = _load_complete_case(tmp_path)
 
@@ -292,8 +400,13 @@ def test_three_engine_comparison_passes_exact_and_numeric_metrics(tmp_path):
 
     assert report["passed"] is True
     assert report["violations"] == []
+    assert report["metric_comparison_performed"] is True
+    assert report["case_evidence"]["cases_sha256"]["passed"] is True
+    assert all(case["passed"] for case in report["case_evidence"]["cases"])
     assert all(metric["passed"] for metric in report["metrics"])
     assert len(report["metrics"][1]["pairs"]) == 3
+    assert "comparison_status" not in report
+    assert "reporter_checks" not in report
 
 
 def test_comparison_rejects_shared_wrong_dataset(tmp_path):
@@ -317,6 +430,59 @@ def test_comparison_rejects_shared_wrong_dataset(tmp_path):
     }
 
 
+def test_comparison_rejects_shared_wrong_cases_hash_without_majority_vote(tmp_path):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = []
+    for engine in ("python", "stata", "r"):
+        value = _result_value(engine)
+        value["metadata"]["cases_sha256"] = "d" * 64
+        result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert report["metric_comparison_performed"] is False
+    assert report["metrics"] == []
+    assert "case_specification_hash_mismatch" in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value", "expected_code"),
+    [
+        ("seed", 20260723, "case_seed_mismatch"),
+        ("included_row_sha256", "d" * 64, "included_row_hash_mismatch"),
+        ("omitted_parameters", ["x1"], "omitted_parameters_mismatch"),
+    ],
+)
+def test_comparison_stops_before_metrics_on_case_evidence_mismatch(
+    tmp_path, field, invalid_value, expected_code
+):
+    manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
+    result_paths = []
+    for engine in ("python", "stata", "r"):
+        value = _result_value(engine)
+        if engine == "r":
+            value["metadata"]["case_execution"][0][field] = invalid_value
+        result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
+
+    report = compare_results(
+        load_manifest(manifest_path),
+        [load_normalized_result(path) for path in result_paths],
+    )
+
+    assert report["passed"] is False
+    assert report["metric_comparison_performed"] is False
+    assert report["metrics"] == []
+    assert expected_code in {
+        violation["code"] for violation in report["violations"]
+    }
+
+
 def test_comparison_rejects_shared_case_omission(tmp_path):
     manifest_path = _write_json(tmp_path / "manifest.yaml", _manifest_value())
     result_paths = []
@@ -330,6 +496,9 @@ def test_comparison_rejects_shared_case_omission(tmp_path):
             },
         )
         value["metadata"]["case_status"] = ["completed"]
+        value["metadata"]["case_execution"] = value["metadata"][
+            "case_execution"
+        ][:1]
         result_paths.append(_write_json(tmp_path / f"{engine}.json", value))
 
     report = compare_results(
@@ -528,6 +697,57 @@ def test_gate_rejects_edited_or_stale_comparison(tmp_path, monkeypatch):
     assert decision["violations"][0]["code"] == "comparison_report_mismatch"
 
 
+@pytest.mark.parametrize(
+    ("field_name", "field_value"),
+    [("comparison_status", "PASS"), ("reporter_checks", {"reviewed": True})],
+)
+def test_check_comparison_rejects_reporter_extensions_and_matches_gate(
+    tmp_path, capsys, monkeypatch, field_name, field_value
+):
+    manifest, results, result_paths = _load_complete_case(tmp_path)
+    comparison = compare_results(manifest, results)
+    comparison[field_name] = field_value
+    comparison_path = _write_json(tmp_path / "comparison.json", comparison)
+    check_output_path = tmp_path / "comparison-check.json"
+    check_args = [
+        "check-comparison",
+        "--manifest",
+        manifest.source_path,
+        "--comparison",
+        str(comparison_path),
+    ]
+    for result_path in result_paths:
+        check_args.extend(["--result", str(result_path)])
+    check_args.extend(["--output", str(check_output_path)])
+
+    assert main(check_args) == 1
+    check_report = json.loads(check_output_path.read_text(encoding="utf-8"))
+    assert check_report["canonical_match"] is False
+    assert check_report["passed"] is False
+    assert check_report["violations"][0]["code"] == "comparison_report_mismatch"
+
+    commit = "c" * 40
+    _patch_git_environment(monkeypatch, commit)
+    gate_report = evaluate_gate(
+        manifest,
+        results,
+        comparison,
+        run_id="test-run",
+        code_audit=_audit_value("code", manifest.sha256, commit),
+        theory_audit=_audit_value("theory", manifest.sha256, commit),
+        workdir=tmp_path,
+    )
+
+    assert gate_report["violations"][0]["code"] == "comparison_report_mismatch"
+    assert check_report["supplied_comparison_sha256"] == gate_report[
+        "supplied_comparison_sha256"
+    ]
+    assert check_report["recomputed_comparison_sha256"] == gate_report[
+        "recomputed_comparison_sha256"
+    ]
+    assert capsys.readouterr().out == ""
+
+
 def test_gate_requires_both_independent_audits(tmp_path):
     manifest, results, _ = _load_complete_case(tmp_path)
     comparison = compare_results(manifest, results)
@@ -707,6 +927,54 @@ def test_gate_cli_never_overwrites_existing_evidence(tmp_path, capsys):
     assert "Refusing to overwrite immutable gate output" in capsys.readouterr().out
 
 
+def test_compare_cli_never_overwrites_existing_evidence(tmp_path, capsys):
+    manifest, _, result_paths = _load_complete_case(tmp_path)
+    output_path = _write_json(tmp_path / "comparison.json", {"keep": True})
+    original_bytes = output_path.read_bytes()
+    args = ["compare", "--manifest", manifest.source_path]
+    for result_path in result_paths:
+        args.extend(["--result", str(result_path)])
+    args.extend(["--output", str(output_path)])
+
+    assert main(args) == 2
+    assert output_path.read_bytes() == original_bytes
+    assert "Refusing to overwrite immutable comparison output" in (
+        capsys.readouterr().out
+    )
+
+
+def test_check_comparison_accepts_exact_cli_artifact(tmp_path):
+    manifest, _, result_paths = _load_complete_case(tmp_path)
+    comparison_path = tmp_path / "comparison.json"
+    check_output_path = tmp_path / "comparison-check.json"
+    compare_args = ["compare", "--manifest", manifest.source_path]
+    for result_path in result_paths:
+        compare_args.extend(["--result", str(result_path)])
+    compare_args.extend(["--output", str(comparison_path)])
+    assert main(compare_args) == 0
+
+    check_args = [
+        "check-comparison",
+        "--manifest",
+        manifest.source_path,
+        "--comparison",
+        str(comparison_path),
+    ]
+    for result_path in result_paths:
+        check_args.extend(["--result", str(result_path)])
+    check_args.extend(["--output", str(check_output_path)])
+
+    assert main(check_args) == 0
+    report = json.loads(check_output_path.read_text(encoding="utf-8"))
+    assert report["kind"] == "comparison_integrity_check"
+    assert report["canonical_match"] is True
+    assert report["scientific_passed"] is True
+    assert report["passed"] is True
+    assert report["supplied_comparison_sha256"] == report[
+        "recomputed_comparison_sha256"
+    ]
+
+
 def test_cli_preflight_compare_and_gate(tmp_path, capsys, monkeypatch):
     manifest, _, result_paths = _load_complete_case(tmp_path)
     manifest_path = Path(manifest.source_path)
@@ -775,3 +1043,48 @@ def test_cli_returns_nonzero_for_failed_scientific_comparison(tmp_path):
         args.extend(["--result", str(path)])
 
     assert main(args) == 1
+
+
+def test_reg_formula_map_separates_mathematical_and_compatibility_sources():
+    formula_map_path = (
+        Path(__file__).resolve().parents[1]
+        / "validation"
+        / "commands"
+        / "reg"
+        / "formula_map.csv"
+    )
+    with formula_map_path.open(encoding="utf-8", newline="") as formula_map_file:
+        rows = list(csv.DictReader(formula_map_file))
+
+    required_columns = {
+        "mathematical_reference",
+        "mathematical_location",
+        "compatibility_reference",
+        "compatibility_location",
+    }
+    assert required_columns <= set(rows[0])
+
+    software_specific_formula_ids = {
+        "REG-CASE-001",
+        "REG-SAMPLE-001",
+        "REG-PARAM-001",
+        "REG-NOCONSTANT-001",
+    }
+    for row in rows:
+        if row["status"] != "implemented":
+            continue
+        assert row["compatibility_reference"]
+        assert row["compatibility_location"]
+        if row["formula_id"] in software_specific_formula_ids:
+            assert row["mathematical_reference"] == "not_applicable"
+            assert row["mathematical_location"] == "not_applicable"
+        else:
+            assert row["mathematical_reference"] not in {
+                "",
+                "not_applicable",
+            }
+            assert row["mathematical_location"] not in {
+                "",
+                "not_applicable",
+            }
+            assert "StataCorp" not in row["mathematical_reference"]

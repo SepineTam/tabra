@@ -11,11 +11,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 REG_DIRECTORY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REG_DIRECTORY))
 
-from runner_common import (  # noqa: E402
+from runner_common import (
     make_document,
     normalize_raw_tsv,
     verify_dataset,
@@ -55,20 +54,33 @@ def main() -> int:
     r_file = Path(__file__).with_name("run.R").resolve()
     with tempfile.TemporaryDirectory(prefix="tabra-reg-r-") as temporary_directory:
         raw_path = Path(temporary_directory) / "r-results.tsv"
+        sample_path = Path(temporary_directory) / "r-samples.tsv"
         completed_process = subprocess.run(
-            [rscript, str(r_file), str(arguments.data.resolve()), str(raw_path)],
+            [
+                rscript,
+                str(r_file),
+                str(arguments.data.resolve()),
+                str(raw_path),
+                str(sample_path),
+            ],
             cwd=temporary_directory,
             capture_output=True,
             text=True,
             check=False,
         )
-        if completed_process.returncode != 0 or not raw_path.is_file():
+        if (
+            completed_process.returncode != 0
+            or not raw_path.is_file()
+            or not sample_path.is_file()
+        ):
             diagnostic = (completed_process.stderr or completed_process.stdout).strip()
             raise RuntimeError(
                 f"R reg validation failed with code {completed_process.returncode}: "
                 f"{diagnostic[-2000:]}"
             )
-        engine_version, cases = normalize_raw_tsv(raw_path)
+        engine_version, cases = normalize_raw_tsv(
+            raw_path, sample_path, arguments.data
+        )
 
     document = make_document(
         engine_name="r",

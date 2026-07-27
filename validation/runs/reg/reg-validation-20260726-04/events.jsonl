@@ -1,0 +1,11 @@
+{"at":"2026-07-26T14:27:08Z","from":null,"to":"DISCOVERED","reason":"Created a fresh immutable run after the third and final bounded repair."}
+{"at":"2026-07-26T14:27:08Z","from":"DISCOVERED","to":"SPEC_PENDING","reason":"Bound the run to committed specification 2.0.3 and all frozen evidence hashes."}
+{"at":"2026-07-26T14:27:08Z","from":"SPEC_PENDING","to":"SPEC_READY","reason":"Preflight, lint, and 59 provenance-focused tests passed with Python, Stata, and R available."}
+{"at":"2026-07-26T14:27:08Z","from":"SPEC_READY","to":"AUDIT_PENDING","reason":"Dispatched fresh independent code and theory audits before engine execution."}
+{"at":"2026-07-26T14:40:29Z","from":"AUDIT_PENDING","to":"AUDITS_READY","reason":"Independent code and theory audits both passed with zero open findings."}
+{"at":"2026-07-26T14:40:29Z","from":"AUDITS_READY","to":"ENGINE_PENDING","reason":"Started Python, Stata, and independent R execution on identical frozen inputs."}
+{"at":"2026-07-26T14:43:59Z","from":"ENGINE_PENDING","to":"ENGINES_READY","reason":"Python, Stata, and R completed both required cases with matching case, seed, and sample identities."}
+{"at":"2026-07-26T14:43:59Z","from":"ENGINES_READY","to":"COMPARE_PENDING","reason":"Dispatched normalized artifacts to an independent three-engine reporter."}
+{"at":"2026-07-26T14:48:34Z","from":"COMPARE_PENDING","to":"COMPARE_READY","reason":"Independent comparison passed all 17 release-critical metrics with no provenance or safety violations."}
+{"at":"2026-07-26T14:48:34Z","from":"COMPARE_READY","to":"GATE_PENDING","reason":"Submitted the complete immutable evidence set to an independent gatekeeper."}
+{"at":"2026-07-26T14:54:09Z","from":"GATE_PENDING","to":"FAILED","reason":"Independent gate rejected the immutable run because the stored comparison object differed from the product comparator's canonical recomputation."}

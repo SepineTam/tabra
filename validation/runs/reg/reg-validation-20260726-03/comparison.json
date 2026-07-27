@@ -1,0 +1,1009 @@
+{
+  "command": "reg",
+  "comparison_status": "BLOCKED_ENV",
+  "machine_comparison": {
+    "command": ".venv/bin/python -m tabra.validation compare",
+    "exit_code": 0,
+    "raw_report_sha256_before_reporter_annotation": "d1d07472bddba2db9125122fd158227fe3470ed8115d839434ef3f11bafb77a8",
+    "scope": "schema, required cases, data hash, versions, and the 17 manifest metrics"
+  },
+  "reporter_checks": {
+    "run_id": "reg-validation-20260726-03",
+    "frozen_identity": {
+      "git_commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+      "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+      "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+      "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+      "formula_map_sha256": "5b3c7233a6522311ceed5936a72433d6c52f46596a92353b96aa8d90dad07eb0",
+      "seed": 20260722
+    },
+    "engine_provenance": {
+      "python": {
+        "commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+        "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+        "cases_sha256": null,
+        "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+        "seed": null,
+        "included_row_sha256": null,
+        "result_sha256": "78c957b4de118cb40da9e3bb5bbfa150d71ee86f4dd5a12ee08ba53fcb94820c"
+      },
+      "stata": {
+        "commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+        "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+        "cases_sha256": null,
+        "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+        "seed": null,
+        "included_row_sha256": null,
+        "result_sha256": "3f51adfbd99b639bd6aad78b74cb1469aa3f9e6db5a731d69a7c95c3618509e1"
+      },
+      "r": {
+        "commit": "64c92fe6b136b5b3adc12895d408e5c20af9214c",
+        "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+        "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+        "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+        "seed": 20260722,
+        "included_row_sha256": "11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76",
+        "result_sha256": "f4bea6b077320b4757980a8b46013b80e7d57f57a9b8848ce159f34f6301ce60"
+      }
+    },
+    "sample_membership_equality": "UNVERIFIABLE",
+    "metric_comparison_performed": true,
+    "metric_comparison_role": "conditional numeric evidence only; it cannot clear missing sample and provenance evidence",
+    "engine_versions": {
+      "python": {"actual": "3.11.11", "requirement": ">=3.11", "passed": true},
+      "stata": {"actual": "19.5", "requirement": ">=16", "passed": true},
+      "r": {"actual": "4.4.1", "requirement": "==4.4.1", "passed": true}
+    },
+    "parameterization": {
+      "case_ids_equal": true,
+      "parameter_names_and_order_equal": true,
+      "degrees_of_freedom_equal": true,
+      "convergence_state_equal": true,
+      "base_categories": "not_applicable",
+      "omitted_parameters": "R records empty lists; Python and Stata do not record this field explicitly",
+      "masks": "Python and Stata do not record an included-row mask or hash"
+    },
+    "audits": {
+      "code_audit_status": "PASS",
+      "theory_audit_status": "PASS",
+      "formula_map_complete": true,
+      "independent_oracle_release_critical_metrics_passed": 17,
+      "independent_oracle_release_critical_metrics_failed": 0
+    },
+    "blocking_issues": [
+      {
+        "classification": "ENGINE_ENV",
+        "engines": ["python", "stata"],
+        "evidence": "Their environment records omit cases_sha256 and seed, so engine-bound equality to the frozen case specification and seed cannot be verified."
+      },
+      {
+        "classification": "MISSING_OUTPUT",
+        "engines": ["python", "stata"],
+        "evidence": "Neither normalized result nor environment record contains included_row_sha256 or an equivalent included-row mask; only R records 11ebba9a3453b6af0b448a00ad5c27aa9f5508a1cfdfacfe130c6752545dcf76."
+      }
+    ],
+    "repair_checklist": [
+      "Create a new run ID; do not alter this run's raw engine outputs.",
+      "Make Python and Stata runners emit cases_sha256, seed, and the canonical included_row_sha256 for every case.",
+      "Repeat both independent audits and all three engine runs on the same frozen commit and hashes, then compare again."
+    ]
+  },
+  "engines": [
+    "python",
+    "stata",
+    "r"
+  ],
+  "kind": "three_engine_comparison",
+  "manifest_sha256": "902392d562a50aa9919cfc58bc95b0018e63044452fa8b6203608142814ecf79",
+  "metrics": [
+    {
+      "name": "case_ids",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "exact": true
+      },
+      "values": {
+        "python": [
+          "basic",
+          "no_constant"
+        ],
+        "r": [
+          "basic",
+          "no_constant"
+        ],
+        "stata": [
+          "basic",
+          "no_constant"
+        ]
+      }
+    },
+    {
+      "name": "nobs",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "exact": true
+      },
+      "values": {
+        "python": [
+          120,
+          120
+        ],
+        "r": [
+          120,
+          120
+        ],
+        "stata": [
+          120,
+          120
+        ]
+      }
+    },
+    {
+      "name": "df_model",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "exact": true
+      },
+      "values": {
+        "python": [
+          2,
+          2
+        ],
+        "r": [
+          2,
+          2
+        ],
+        "stata": [
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "name": "df_resid",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "exact": true
+      },
+      "values": {
+        "python": [
+          117,
+          118
+        ],
+        "r": [
+          117,
+          118
+        ],
+        "stata": [
+          117,
+          118
+        ]
+      }
+    },
+    {
+      "name": "parameter_names",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "exact": true
+      },
+      "values": {
+        "python": [
+          [
+            "x1",
+            "x2",
+            "_cons"
+          ],
+          [
+            "x1",
+            "x2"
+          ]
+        ],
+        "r": [
+          [
+            "x1",
+            "x2",
+            "_cons"
+          ],
+          [
+            "x1",
+            "x2"
+          ]
+        ],
+        "stata": [
+          [
+            "x1",
+            "x2",
+            "_cons"
+          ],
+          [
+            "x1",
+            "x2"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "coefficients",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 1.7763568394002505e-15,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 3.1086244689504383e-15,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 4.884981308350689e-15,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-09
+      },
+      "values": {
+        "python": [
+          [
+            2.4069521063774233,
+            -0.8200631259823029,
+            1.6812901529393778
+          ],
+          [
+            2.298318605567287,
+            -0.8206119775920795
+          ]
+        ],
+        "r": [
+          [
+            2.40695210637742,
+            -0.820063125982304,
+            1.68129015293938
+          ],
+          [
+            2.29831860556729,
+            -0.82061197759208
+          ]
+        ],
+        "stata": [
+          [
+            2.406952106377425,
+            -0.8200631259823036,
+            1.6812901529393773
+          ],
+          [
+            2.298318605567289,
+            -0.82061197759208
+          ]
+        ]
+      }
+    },
+    {
+      "name": "standard_errors",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 2.7755575615628914e-17,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 3.608224830031759e-16,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 3.608224830031759e-16,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          [
+            0.03752003308109958,
+            0.0424577073591154,
+            0.03512838040010806
+          ],
+          [
+            0.16917168766937923,
+            0.19178609635590663
+          ]
+        ],
+        "r": [
+          [
+            0.0375200330810996,
+            0.0424577073591154,
+            0.035128380400108
+          ],
+          [
+            0.169171687669379,
+            0.191786096355907
+          ]
+        ],
+        "stata": [
+          [
+            0.03752003308109959,
+            0.04245770735911541,
+            0.035128380400108045
+          ],
+          [
+            0.1691716876693792,
+            0.19178609635590663
+          ]
+        ]
+      }
+    },
+    {
+      "name": "test_statistics",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 4.263256414560601e-14,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 5.684341886080802e-14,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 4.973799150320701e-14,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-09,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          [
+            64.15111898155298,
+            -19.314823550081314,
+            47.861305696126145
+          ],
+          [
+            13.585716600871223,
+            -4.278787634684584
+          ]
+        ],
+        "r": [
+          [
+            64.151118981553,
+            -19.3148235500813,
+            47.8613056961262
+          ],
+          [
+            13.5857166008712,
+            -4.27878763468459
+          ]
+        ],
+        "stata": [
+          [
+            64.15111898155303,
+            -19.31482355008133,
+            47.86130569612615
+          ],
+          [
+            13.585716600871235,
+            -4.278787634684587
+          ]
+        ]
+      }
+    },
+    {
+      "name": "p_values",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 5.827586677109586e-19,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 4.54009659728305e-19,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 1.2874900798265365e-19,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": true
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          [
+            5.089289619277885e-93,
+            3.4212390558695086e-38,
+            1.1031530193039544e-78
+          ],
+          [
+            6.954966563121992e-26,
+            3.8410727594931455e-05
+          ]
+        ],
+        "r": [
+          [
+            5.08928961927799e-93,
+            3.42123905586929e-38,
+            1.1031530193039e-78
+          ],
+          [
+            6.95496656312169e-26,
+            3.8410727594931e-05
+          ]
+        ],
+        "stata": [
+          [
+            5.089289619277556e-93,
+            3.421239055869285e-38,
+            1.103153019303933e-78
+          ],
+          [
+            6.954966563121544e-26,
+            3.841072759493087e-05
+          ]
+        ]
+      }
+    },
+    {
+      "name": "r_squared",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 2.220446049250313e-16,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 3.3306690738754696e-16,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 4.440892098500626e-16,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          0.9724330765125854,
+          0.6110906237033638
+        ],
+        "r": [
+          0.972433076512585,
+          0.611090623703364
+        ],
+        "stata": [
+          0.9724330765125854,
+          0.6110906237033635
+        ]
+      }
+    },
+    {
+      "name": "r_squared_adj",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 2.220446049250313e-16,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 1.1102230246251565e-16,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 2.220446049250313e-16,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          0.9719618470512621,
+          0.604498939359353
+        ],
+        "r": [
+          0.971961847051262,
+          0.604498939359353
+        ],
+        "stata": [
+          0.9719618470512621,
+          0.6044989393593527
+        ]
+      }
+    },
+    {
+      "name": "f_stat",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 4.547473508864641e-13,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 4.547473508864641e-13,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 9.094947017729282e-13,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-09,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          2063.6084038161694,
+          92.70629353764514
+        ],
+        "r": [
+          2063.60840381617,
+          92.7062935376451
+        ],
+        "stata": [
+          2063.608403816169,
+          92.70629353764508
+        ]
+      }
+    },
+    {
+      "name": "f_p_value",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 1.6346718316122436e-38,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 1.8367099231598242e-39,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 1.818342823928226e-38,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": true
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          5.790493786860803e-92,
+          6.324940034154269e-25
+        ],
+        "r": [
+          5.79049378686107e-92,
+          6.32494003415425e-25
+        ],
+        "stata": [
+          5.79049378686074e-92,
+          6.324940034154432e-25
+        ]
+      }
+    },
+    {
+      "name": "ss_residual",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 5.684341886080802e-14,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 1.1368683772161603e-13,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 5.684341886080802e-14,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          17.25765313422786,
+          355.1395772823539
+        ],
+        "r": [
+          17.2576531342279,
+          355.139577282354
+        ],
+        "stata": [
+          17.257653134227862,
+          355.13957728235397
+        ]
+      }
+    },
+    {
+      "name": "ss_model",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 2.2737367544323206e-13,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 3.410605131648481e-13,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 1.1368683772161603e-13,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          608.7698809903771,
+          558.0283711588663
+        ],
+        "r": [
+          608.769880990377,
+          558.028371158866
+        ],
+        "stata": [
+          608.7698809903771,
+          558.0283711588661
+        ]
+      }
+    },
+    {
+      "name": "ss_total",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 2.2737367544323206e-13,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 2.2737367544323206e-13,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 0.0,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          626.027534124605,
+          913.1679484412202
+        ],
+        "r": [
+          626.027534124605,
+          913.16794844122
+        ],
+        "stata": [
+          626.027534124605,
+          913.16794844122
+        ]
+      }
+    },
+    {
+      "name": "root_mse",
+      "pairs": [
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 5.551115123125783e-17,
+          "passed": true,
+          "right_engine": "stata"
+        },
+        {
+          "issues": [],
+          "left_engine": "python",
+          "max_abs_difference": 1.5543122344752192e-15,
+          "passed": true,
+          "right_engine": "r"
+        },
+        {
+          "issues": [],
+          "left_engine": "stata",
+          "max_abs_difference": 1.5543122344752192e-15,
+          "passed": true,
+          "right_engine": "r"
+        }
+      ],
+      "passed": true,
+      "safety": {
+        "reject_zero_mismatch": false
+      },
+      "tolerance": {
+        "atol": 1e-10,
+        "rtol": 1e-08
+      },
+      "values": {
+        "python": [
+          0.38405899135361266,
+          1.7348364287725284
+        ],
+        "r": [
+          0.384058991353613,
+          1.73483642877253
+        ],
+        "stata": [
+          0.3840589913536127,
+          1.7348364287725284
+        ]
+      }
+    }
+  ],
+  "passed": true,
+  "result_sha256": {
+    "python": "78c957b4de118cb40da9e3bb5bbfa150d71ee86f4dd5a12ee08ba53fcb94820c",
+    "r": "f4bea6b077320b4757980a8b46013b80e7d57f57a9b8848ce159f34f6301ce60",
+    "stata": "3f51adfbd99b639bd6aad78b74cb1469aa3f9e6db5a731d69a7c95c3618509e1"
+  },
+  "schema_version": 1,
+  "violations": []
+}

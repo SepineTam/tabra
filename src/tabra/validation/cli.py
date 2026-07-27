@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from .compare import compare_results
+from .compare import check_comparison_integrity, compare_results
 from .errors import ValidationError
 from .gate import evaluate_gate
 from .io import (
@@ -135,9 +135,22 @@ def _preflight(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
 
 
 def _compare(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    if args.output is not None and Path(args.output).exists():
+        raise ValidationError(
+            "Refusing to overwrite immutable comparison output: "
+            f"{args.output}; create a new run ID"
+        )
     manifest = load_manifest(args.manifest)
     results = [load_normalized_result(path) for path in args.result]
     report = compare_results(manifest, results)
+    return report, 0 if report["passed"] else 1
+
+
+def _check_comparison(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
+    manifest = load_manifest(args.manifest)
+    results = [load_normalized_result(path) for path in args.result]
+    comparison = load_json_document(args.comparison)
+    report, _ = check_comparison_integrity(manifest, results, comparison)
     return report, 0 if report["passed"] else 1
 
 
@@ -199,6 +212,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compare_parser.add_argument("--output", help="Optional comparison JSON path.")
     compare_parser.set_defaults(handler=_compare)
+
+    check_comparison_parser = subparsers.add_parser(
+        "check-comparison",
+        help="Verify a stored comparison against the canonical recomputed object.",
+    )
+    check_comparison_parser.add_argument("--manifest", required=True)
+    check_comparison_parser.add_argument("--comparison", required=True)
+    check_comparison_parser.add_argument(
+        "--result",
+        required=True,
+        action="append",
+        help="Normalized result JSON; provide once per engine.",
+    )
+    check_comparison_parser.add_argument(
+        "--output", help="Optional comparison integrity JSON path."
+    )
+    check_comparison_parser.set_defaults(handler=_check_comparison)
 
     gate_parser = subparsers.add_parser(
         "gate", help="Recompute comparison evidence and issue an attestation."

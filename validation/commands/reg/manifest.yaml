@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "specification_version": "2.0.3",
   "command": "reg",
   "public_api": "TabraData.est.reg(y, x, is_con=True)",
   "implementation": "src/tabra/models/estimate/ols.py::OLS.fit",
@@ -17,6 +18,64 @@
     "r": {"locked_version": "4.4.1", "lockfile": "r/renv.lock"}
   },
   "supported_cases": ["basic", "no_constant"],
+  "cases": {
+    "path": "cases.yaml",
+    "sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07"
+  },
+  "required_outputs": {
+    "metadata": {
+      "engine": {"type": "string", "unit": "identifier"},
+      "engine_version": {"type": "string", "unit": "version"},
+      "dataset_path": {"type": "string", "unit": "repository-relative path"},
+      "dataset_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
+      "cases_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
+      "case_status": {"type": "object", "unit": "case counts"},
+      "case_execution": {"type": "ordered array", "unit": "per-case execution evidence"}
+    },
+    "case": {
+      "case_id": {"type": "string", "unit": "identifier"},
+      "status": {"type": "string", "allowed": ["completed"]},
+      "converged": {"type": "boolean", "allowed": [true]},
+      "n_obs": {"type": "integer", "unit": "observations"},
+      "df_model": {"type": "integer", "unit": "degrees of freedom"},
+      "df_resid": {"type": "integer", "unit": "degrees of freedom"},
+      "seed": {"type": "integer", "unit": "random seed"},
+      "included_row_sha256": {"type": "string", "unit": "lowercase hexadecimal"},
+      "omitted_parameters": {"type": "ordered array", "unit": "canonical parameter identifiers"}
+    },
+    "parameters": {
+      "type": "ordered array",
+      "ordering": "requested independent variables followed by _cons only when include_constant is true",
+      "fields": {
+        "name": {"type": "string", "unit": "identifier"},
+        "estimate": {"type": "number", "unit": "dependent-variable units per regressor unit"},
+        "std_error": {"type": "number", "unit": "coefficient units"},
+        "statistic": {"type": "number", "unit": "t statistic"},
+        "p_value": {"type": "number", "unit": "probability"}
+      }
+    },
+    "statistics": {
+      "r_squared": {"type": "number", "unit": "proportion"},
+      "r_squared_adj": {"type": "number", "unit": "proportion"},
+      "f_stat": {"type": "number", "unit": "F statistic"},
+      "f_p_value": {"type": "number", "unit": "probability"},
+      "ss_residual": {"type": "number", "unit": "squared dependent-variable units"},
+      "ss_model": {"type": "number", "unit": "squared dependent-variable units"},
+      "ss_total": {"type": "number", "unit": "squared dependent-variable units"},
+      "root_mse": {"type": "number", "unit": "dependent-variable units"}
+    }
+  },
+  "estimation_contract": {
+    "sample_selection": "complete cases across y and every requested x",
+    "missing_values": "drop a row when y or any requested x is missing",
+    "constant": "append one fitted constant named _cons only when is_con is true",
+    "weights": "unsupported; every case is unweighted",
+    "base_category": "not applicable",
+    "convergence": "closed-form least squares must complete with a full-rank design and finite outputs",
+    "vce": "homoskedastic s^2 (X'X)^-1 with s^2 = RSS / (N-k)",
+    "small_sample_correction": "residual variance divisor is N-k",
+    "degrees_of_freedom": "df_model=k-c and df_resid=N-k, where c indicates a fitted constant"
+  },
   "unsupported_options": [
     {
       "option": "robust",
@@ -56,6 +115,29 @@
     "A dataset SHA-256 mismatch is a validation failure.",
     "Engine agreement does not override a contradiction with the independent formula oracle."
   ],
+  "release_policy": {
+    "release_critical_metrics": [
+      "case_ids",
+      "nobs",
+      "df_model",
+      "df_resid",
+      "parameter_names",
+      "coefficients",
+      "standard_errors",
+      "test_statistics",
+      "p_values",
+      "r_squared",
+      "r_squared_adj",
+      "f_stat",
+      "f_p_value",
+      "ss_residual",
+      "ss_model",
+      "ss_total",
+      "root_mse"
+    ],
+    "informational_metrics": [],
+    "skip_policy": "any skipped, missing, errored, or nonconverged required case blocks release"
+  },
   "data": {
     "generator": "data/generate.py",
     "seed": 20260722,
@@ -65,5 +147,30 @@
   },
   "theory": "theory.md",
   "formula_map": "formula_map.csv",
+  "primary_sources": [
+    {
+      "id": "lai-xing-2008",
+      "role": "mathematical",
+      "citation": "Lai, T. L. and Xing, H. (2008), Statistical Models and Methods for Financial Markets, Springer Texts in Statistics",
+      "doi": "10.1007/978-0-387-77827-3",
+      "url": "https://link.springer.com/book/10.1007/978-0-387-77827-3",
+      "exact_locations": "p. 4 eq. (1.2); p. 5 eqs. (1.4)-(1.5) and following RSS definition; p. 7 eqs. (1.9)-(1.10); p. 8 eq. (1.15); pp. 8-10 eqs. (1.11)-(1.14) and (1.22); pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1; pp. 13-14 eqs. (1.27)-(1.28)"
+    },
+    {
+      "id": "fisher-1922",
+      "role": "mathematical",
+      "citation": "Fisher, R. A. (1922), The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients, JRSS 85(4):597-612",
+      "doi": "10.2307/2341124",
+      "url": "http://hdl.handle.net/2440/15174",
+      "exact_locations": "journal pp. 607-610, section 6"
+    },
+    {
+      "id": "stata-regress-19",
+      "role": "software_compatibility",
+      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "exact_locations": "p. 15; pp. 8-10 and 22-23; pp. 7 and 26; p. 22 eq. (2); p. 23 eq. (3)"
+    }
+  ],
   "normalized_result_schema": "../../schema/normalized-result.schema.json"
 }

@@ -1,0 +1,11 @@
+{"at":"2026-07-27T06:04:21Z","from":null,"to":"DISCOVERED","reason":"Created a fresh run after fixing the canonical comparison evidence workflow; immutable run04 remains FAILED."}
+{"at":"2026-07-27T06:04:21Z","from":"DISCOVERED","to":"SPEC_PENDING","reason":"Bound the run to committed validation infrastructure 9ce5b59 and the unchanged frozen reg specification."}
+{"at":"2026-07-27T06:04:21Z","from":"SPEC_PENDING","to":"SPEC_READY","reason":"Preflight passed with Python, Stata, and R available; 55 comparison and gate tests passed before dispatch."}
+{"at":"2026-07-27T06:04:21Z","from":"SPEC_READY","to":"AUDIT_PENDING","reason":"Dispatched fresh independent code and theory audits for the new commit and run ID."}
+{"at":"2026-07-27T06:20:55Z","from":"AUDIT_PENDING","to":"AUDITS_READY","reason":"Independent code and theory audits both passed with zero open findings on commit 9ce5b59."}
+{"at":"2026-07-27T06:20:55Z","from":"AUDITS_READY","to":"ENGINE_PENDING","reason":"Started fresh Python, Stata, and independent R execution on identical frozen inputs."}
+{"at":"2026-07-27T06:26:22Z","from":"ENGINE_PENDING","to":"ENGINES_READY","reason":"Python, Stata, and R freshly completed both required cases with matching case, seed, data, and sample identities."}
+{"at":"2026-07-27T06:26:22Z","from":"ENGINES_READY","to":"COMPARE_PENDING","reason":"Started canonical product comparison before independent Markdown review."}
+{"at":"2026-07-27T06:31:51Z","from":"COMPARE_PENDING","to":"COMPARISON_READY","reason":"Canonical comparison passed all 17 metrics and the independent pre-gate integrity check confirmed exact object identity."}
+{"at":"2026-07-27T06:31:51Z","from":"COMPARISON_READY","to":"GATE_PENDING","reason":"Submitted the complete immutable run05 evidence set to a fresh independent gatekeeper."}
+{"at":"2026-07-27T06:39:07Z","from":"GATE_PENDING","to":"PASSED","reason":"Independent product Gate issued a clean immutable attestation for commit 9ce5b59 after exact canonical comparison recomputation."}

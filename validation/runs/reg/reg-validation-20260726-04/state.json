@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-04",
+  "status": "FAILED",
+  "attempt": 4,
+  "retry_limit": 3,
+  "repair_attempts_used": 3,
+  "git_commit": "47aebd1b2681607027a70275eb443060c5df0457",
+  "manifest_sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+  "created_at": "2026-07-26T14:27:08Z",
+  "updated_at": "2026-07-26T14:54:09Z"
+}

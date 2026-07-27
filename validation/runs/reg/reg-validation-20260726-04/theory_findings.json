@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-04",
+  "audit_date": "2026-07-26",
+  "theory_audit_status": "PASS",
+  "audited_commit": "47aebd1b2681607027a70275eb443060c5df0457",
+  "gate_decision_issued": false,
+  "blocked_environment": false,
+  "frozen_inputs": {
+    "commit": "47aebd1b2681607027a70275eb443060c5df0457",
+    "manifest_sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "theory_sha256": "fd71801b0d33503cf2acd224edb7662904c8de7de89cc2bd15c82dfcc047fb8c",
+    "formula_map_sha256": "5b3c7233a6522311ceed5936a72433d6c52f46596a92353b96aa8d90dad07eb0",
+    "independent_oracle_sha256": "0d9ea04248ca057d09ccaa0feb1d7c2510f6435ff6fe2e4ced85d03509cb6d68",
+    "normalized_result_schema_sha256": "05823ed8e65c55dab2db5d308305e1293fc433c3492511f32d85142d83a60a89",
+    "tracked_worktree_clean_at_capture": true
+  },
+  "formula_map_summary": {
+    "row_count": 21,
+    "implemented": 20,
+    "blocked_unsupported": 1,
+    "normalized_release_critical_metric_count": 17,
+    "supported_normalized_metric_coverage": true,
+    "complete_public_report_coverage": true,
+    "complete_release_critical_coverage": true,
+    "count_note": "The manifest names 17 normalized release-critical metrics. Public 95% intervals and Total-row df/MS are additional mapped report quantities. The formula map has 21 data rows: 20 implemented and one blocked."
+  },
+  "authoritative_sources": [
+    {
+      "citation": "Lai, T. L. and Xing, H. (2008), Statistical Models and Methods for Financial Markets, Springer Texts in Statistics.",
+      "doi": "https://doi.org/10.1007/978-0-387-77827-3",
+      "chapter_doi": "https://doi.org/10.1007/978-0-387-77827-3_1",
+      "locations": [
+        "p. 4 eq. (1.2)",
+        "p. 5 eqs. (1.4)-(1.5)",
+        "p. 7 eqs. (1.9)-(1.10)",
+        "pp. 8-10 eqs. (1.11)-(1.15) and (1.22)",
+        "pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1",
+        "pp. 13-14 eqs. (1.27)-(1.28)"
+      ],
+      "role": "primary mathematical and inferential support"
+    },
+    {
+      "citation": "Fisher, R. A. (1922), The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients, Journal of the Royal Statistical Society 85(4):597-612.",
+      "doi": "https://doi.org/10.2307/2341124",
+      "institutional_record": "http://hdl.handle.net/2440/15174",
+      "locations": [
+        "journal pp. 607-610, section 6"
+      ],
+      "role": "original finite-sample regression-coefficient distribution support; not modern matrix or software support"
+    },
+    {
+      "citation": "StataCorp LLC (2025), Stata 19 Base Reference Manual, [R] regress.",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "locations": [
+        "p. 7",
+        "pp. 8-10",
+        "p. 15",
+        "p. 22 eq. (2) and ANOVA definitions",
+        "p. 23 eq. (3)",
+        "p. 26"
+      ],
+      "role": "authoritative software-compatibility and reporting documentation; not mathematical proof"
+    }
+  ],
+  "verified_checks": [
+    {
+      "check_id": "VC-REG-04-001",
+      "subject": "frozen inputs",
+      "status": "verified",
+      "evidence": "The audited commit and all seven frozen file SHA-256 values match inputs.json exactly."
+    },
+    {
+      "check_id": "VC-REG-04-002",
+      "subject": "OLS objective, coefficients, sample, parameter order, and degrees of freedom",
+      "status": "verified",
+      "formula_ids": ["REG-OBJ-001", "REG-COEF-001", "REG-SAMPLE-001", "REG-PARAM-001", "REG-DF-001"],
+      "source_locations": ["Lai and Xing (2008), pp. 4-7", "Stata 19 [R] regress pp. 15 and 22"],
+      "code_locations": ["src/tabra/models/estimate/base.py:19-23", "src/tabra/models/estimate/ols.py:36-90", "src/tabra/models/estimate/stats.py:14-19"],
+      "test_locations": ["tests/test_ols.py", "tests/test_estimate_base_stats.py"]
+    },
+    {
+      "check_id": "VC-REG-04-003",
+      "subject": "RSS, centered or uncentered TSS, MSS, R-squared, and adjusted R-squared",
+      "status": "verified",
+      "formula_ids": ["REG-RSS-001", "REG-TSS-001", "REG-MSS-001", "REG-R2-001", "REG-AR2-001"],
+      "source_locations": ["Lai and Xing (2008), pp. 5 and 10-14", "Stata 19 [R] regress pp. 8-10 and 22-23"],
+      "code_locations": ["src/tabra/models/estimate/ols.py:71-88", "src/tabra/models/estimate/ols.py:144-145", "src/tabra/models/estimate/stats.py:22-37"],
+      "test_locations": ["tests/test_ols.py", "tests/test_estimate_base_stats.py"]
+    },
+    {
+      "check_id": "VC-REG-04-004",
+      "subject": "homoskedastic variance, standard errors, residual MSE, and Root MSE",
+      "status": "verified",
+      "formula_ids": ["REG-VCE-001", "REG-SE-001", "REG-RMSE-001"],
+      "source_locations": ["Lai and Xing (2008), p. 7 eqs. (1.9)-(1.10)", "Stata 19 [R] regress pp. 22-23"],
+      "code_locations": ["src/tabra/models/estimate/ols.py:91-106", "src/tabra/models/estimate/ols.py:152-160", "src/tabra/models/estimate/stats.py:69-76"],
+      "test_locations": ["tests/test_ols.py", "tests/test_estimate_base_stats.py"]
+    },
+    {
+      "check_id": "VC-REG-04-005",
+      "subject": "coefficient t statistics, two-sided p-values, and 95% confidence intervals",
+      "status": "verified",
+      "formula_ids": ["REG-T-001", "REG-TP-001", "REG-CI95-001"],
+      "source_locations": ["Lai and Xing (2008), pp. 8-10 eqs. (1.11)-(1.15) and (1.22)", "Stata 19 [R] regress pp. 7 and 26"],
+      "code_locations": ["src/tabra/models/estimate/ols.py:127-142", "src/tabra/ops/stats.py:40-50", "src/tabra/results/ols_result.py:155-166"],
+      "test_locations": ["tests/test_ols.py", "tests/ops/test_stats.py", "tests/test_ols_result.py::TestCoefficientConfidenceInterval::test_95_percent_confidence_interval_uses_t_distribution"],
+      "parameter_sets": ["is_con=True", "is_con=False"],
+      "limitation": "Exact finite-sample t inference and 95% coverage require conditionally spherical normal errors."
+    },
+    {
+      "check_id": "VC-REG-04-006",
+      "subject": "joint F statistic and right-tail p-value",
+      "status": "verified",
+      "formula_ids": ["REG-F-001", "REG-FP-001"],
+      "source_locations": ["Lai and Xing (2008), pp. 10-12 eqs. (1.23)-(1.25) and Table 1.1", "Stata 19 [R] regress pp. 7 and 22-23"],
+      "code_locations": ["src/tabra/models/estimate/ols.py:146-151", "src/tabra/models/estimate/stats.py:39-44", "src/tabra/ops/stats.py:53-64"],
+      "test_locations": ["tests/test_ols.py", "tests/test_estimate_base_stats.py", "tests/ops/test_stats.py"]
+    },
+    {
+      "check_id": "VC-REG-04-007",
+      "subject": "no-constant public Total row",
+      "status": "verified",
+      "formula_ids": ["REG-NOCONSTANT-001", "REG-DF-001", "REG-TSS-001"],
+      "source_location": "Stata 19 [R] regress pp. 8-10 and 22-23",
+      "code_locations": ["src/tabra/models/estimate/ols.py:74-90", "src/tabra/results/ols_result.py:107-152"],
+      "test_id": "tests/test_ols_result.py::TestAnovaAlignment::test_total_df_and_ms_follow_constant_convention",
+      "evidence": "Without a constant, Total df=N and Total MS=TSS/N; with a constant, Total df=N-1 and Total MS=TSS/(N-1)."
+    },
+    {
+      "check_id": "VC-REG-04-008",
+      "subject": "joint complete-case sample",
+      "status": "verified",
+      "formula_ids": ["REG-SAMPLE-001"],
+      "source_location": "Stata 19 [R] regress p. 15",
+      "code_locations": ["src/tabra/models/estimate/base.py:19-23", "src/tabra/models/estimate/ols.py:36"],
+      "test_id": "tests/test_ols.py::test_partial_missing_rows_use_joint_complete_case_sample",
+      "limitation": "The frozen fixture contains no missing values, and complete-case behavior does not establish an ignorable missingness mechanism."
+    },
+    {
+      "check_id": "VC-REG-04-009",
+      "subject": "source-role separation and original-method provenance",
+      "status": "verified",
+      "evidence": "Lai and Xing and Fisher provide mathematical history/support. The Stata manual is used only for compatibility conventions. No Stata or R output was treated as proof."
+    }
+  ],
+  "findings": [],
+  "execution_evidence": {
+    "targeted_tests": {
+      "command": "uv run pytest -q -o addopts='' tests/test_ols.py tests/test_estimate_base_stats.py tests/test_ols_result.py tests/ops/test_stats.py",
+      "result": "73 passed in 1.16s",
+      "skipped": 0,
+      "warnings": 0
+    },
+    "cross_engine_outputs_used_as_theory_proof": false,
+    "independent_oracle_executed_by_this_audit": false
+  },
+  "scope_boundaries": [
+    "REG-VCE-ROBUST-001 is explicitly blocked and is not counted as implemented support.",
+    "Weighted, heteroskedasticity-robust, clustered, and other non-classical covariance estimators were not audited.",
+    "Rank-deficient and other degenerate designs are outside the frozen supported cases.",
+    "Complete-case fitting changes the analysis sample and does not justify a missing-at-random claim.",
+    "The audited estimator has no causal interpretation without a separate identification design."
+  ],
+  "decision_reasons": [
+    "All 17 normalized release-critical metrics have support appropriate to their role and complete formula-to-code-to-test mappings.",
+    "Public 95% intervals and constant/no-constant Total-row df/MS are separately mapped and tested.",
+    "Primary mathematical sources, the original methodological source, and authoritative compatibility documentation were accessible and their roles are separated.",
+    "No theoretical or formula-to-code mismatch was found, so the theory-audit result is PASS.",
+    "This theory audit does not issue the final validation gate decision."
+  ]
+}

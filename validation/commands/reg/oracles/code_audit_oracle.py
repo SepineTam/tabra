@@ -19,10 +19,9 @@ import numpy as np
 import scipy
 from scipy import stats
 
-
 FROZEN_HASHES = {
-    "manifest": "533e96bde7c0fd15dcc532f127789ab300c21f378c7b344ac99be6a4cafa26d7",
-    "cases": "d6dc76648bcd0433795b60c2f65d46cc89167565384c23e24d864525d42ea7e7",
+    "manifest": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+    "cases": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
     "data": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
 }
 
@@ -225,9 +224,9 @@ def main() -> int:
         case_id = case_specification["case_id"]
         case_invariants[case_id] = invariants
         expected_by_metric["case_ids"].append(case_id)
-        for metric_name in expected_by_metric:
+        for metric_name, metric_values in expected_by_metric.items():
             if metric_name != "case_ids":
-                expected_by_metric[metric_name].append(expected_case[metric_name])
+                metric_values.append(expected_case[metric_name])
 
     comparisons: dict[str, dict[str, Any]] = {}
     for metric_name, metric_specification in manifest["metrics"].items():

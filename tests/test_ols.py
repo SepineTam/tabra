@@ -322,6 +322,57 @@ def test_all_missing_sample_is_rejected():
         OLS().fit(data, y="y", x=["x"], is_con=True)
 
 
+def test_partial_missing_rows_use_joint_complete_case_sample():
+    from tabra.models.estimate.ols import OLS
+
+    data = pd.DataFrame(
+        {
+            "y": [2.0, np.nan, 5.0, 8.0, 11.0, 14.0, 17.0, 20.0, 25.0],
+            "x1": [0.0, 1.0, 2.0, np.nan, 4.0, 5.0, 6.0, 7.0, 8.0],
+            "x2": [1.0, 0.0, 1.0, 2.0, 0.0, np.nan, 3.0, 1.0, 4.0],
+            "unused": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, np.nan, 8.0, 9.0],
+        }
+    )
+    retained_rows = [0, 2, 4, 6, 7, 8]
+    retained = data.iloc[retained_rows]
+    expected_design = np.column_stack(
+        [
+            retained["x2"].to_numpy(),
+            retained["x1"].to_numpy(),
+            np.ones(len(retained_rows)),
+        ]
+    )
+    expected_response = retained["y"].to_numpy()
+    expected_coefficients = np.linalg.lstsq(
+        expected_design, expected_response, rcond=None
+    )[0]
+    expected_residuals = expected_response - expected_design @ expected_coefficients
+    residual_degrees_of_freedom = len(retained_rows) - expected_design.shape[1]
+    residual_variance = (
+        expected_residuals @ expected_residuals
+    ) / residual_degrees_of_freedom
+    expected_standard_errors = np.sqrt(
+        residual_variance
+        * np.diag(np.linalg.inv(expected_design.T @ expected_design))
+    )
+    total_sum_of_squares = np.sum(
+        (expected_response - expected_response.mean()) ** 2
+    )
+    expected_r_squared = 1.0 - (
+        expected_residuals @ expected_residuals
+    ) / total_sum_of_squares
+
+    result = OLS().fit(data, y="y", x=["x2", "x1"], is_con=True)
+
+    assert result.n_obs == len(retained_rows)
+    assert result.var_names == ["x2", "x1", "_cons"]
+    assert np.allclose(result.coef, expected_coefficients)
+    assert np.allclose(result.std_err, expected_standard_errors)
+    assert len(result.resid) == len(retained_rows)
+    assert np.allclose(result.resid, expected_residuals)
+    assert result.r_squared == pytest.approx(expected_r_squared)
+
+
 def test_n_equals_k_is_rejected():
     from tabra.models.estimate.ols import OLS
 

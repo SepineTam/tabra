@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260726-01",
+  "audit_date": "2026-07-26",
+  "theory_audit_status": "FAIL",
+  "audited_commit": "4500f443f8a021cd9d9ae9cfee028ae2961dda96",
+  "gate_decision_issued": false,
+  "blocked_environment": false,
+  "frozen_inputs": {
+    "commit": "4500f443f8a021cd9d9ae9cfee028ae2961dda96",
+    "manifest_sha256": "414ed36be847a31db40f46ed00c5fb9793fb0773d04072bc656f8d03e38c56b5",
+    "cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07",
+    "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+    "theory_sha256": "a55caa8832d1b3c6f92e3b5c49b66997c7313dc2ef004bd9004605a7d1443050",
+    "formula_map_sha256": "1dc518e2edf22c5ec0a6c756b24be45477aa939477031571579e8f86e10be3fe",
+    "independent_oracle_sha256": "527b609e22a95163b99149c271e448774de76bd19702de7bbb79fcb4118a39ce",
+    "tracked_worktree_dirty": false
+  },
+  "formula_map_summary": {
+    "row_count": 20,
+    "implemented": 19,
+    "blocked_unsupported": 1,
+    "complete_release_critical_coverage": false,
+    "mathematical_expressions_consistent_with_implementation": true,
+    "independent_oracle_executable_for_frozen_inputs": false,
+    "complete_case_rule_independently_tested": false,
+    "original_method_and_software_compatibility_sources_separated": false
+  },
+  "authoritative_sources": [
+    {
+      "citation": "StataCorp LLC. 2025. Stata 19 Base Reference Manual, [R] regress.",
+      "url": "https://www.stata.com/manuals/rregress.pdf",
+      "locations": [
+        "p. 7",
+        "pp. 9-10",
+        "p. 15",
+        "pp. 22-23",
+        "p. 26"
+      ],
+      "role": "authoritative formulas and Stata software-compatibility parameterization"
+    },
+    {
+      "citation": "Fisher, R. A. 1922. The Goodness of Fit of Regression Formulae, and the Distribution of Regression Coefficients. Journal of the Royal Statistical Society 85(4): 597-612.",
+      "doi": "https://doi.org/10.2307/2341124",
+      "role": "original methodological context for regression inference; no exact formula location is asserted in the frozen map"
+    },
+    {
+      "citation": "Aitken, A. C. 1936. On Least Squares and Linear Combination of Observations. Proceedings of the Royal Society of Edinburgh 55: 42-48.",
+      "doi": "https://doi.org/10.1017/S0370164600014346",
+      "role": "original methodological context for least squares; no exact formula location is asserted in the frozen map"
+    },
+    {
+      "citation": "White, H. 1980. A Heteroskedasticity-Consistent Covariance Matrix Estimator and a Direct Test for Heteroskedasticity. Econometrica 48(4): 817-838.",
+      "doi": "https://doi.org/10.2307/1912934",
+      "role": "original source for an excluded robust extension only"
+    }
+  ],
+  "verification": {
+    "mapped_unit_tests": {
+      "command": ".venv/bin/python -m pytest -q -o addopts='' tests/test_ols.py tests/test_estimate_base_stats.py tests/test_api.py::TestRegAPI tests/ops/test_stats.py",
+      "status": "PASS",
+      "passed": 55,
+      "role": "software mapping evidence, not mathematical proof"
+    },
+    "independent_oracle_probe": {
+      "status": "FAIL",
+      "exit_code": 1,
+      "error": "RuntimeError: Frozen input hash mismatch",
+      "oracle_expected_manifest_sha256": "533e96bde7c0fd15dcc532f127789ab300c21f378c7b344ac99be6a4cafa26d7",
+      "oracle_expected_cases_sha256": "d6dc76648bcd0433795b60c2f65d46cc89167565384c23e24d864525d42ea7e7",
+      "observed_manifest_sha256": "414ed36be847a31db40f46ed00c5fb9793fb0773d04072bc656f8d03e38c56b5",
+      "observed_cases_sha256": "1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07"
+    }
+  },
+  "findings": [
+    {
+      "finding_id": "TA-REG-20260726-001",
+      "severity": "critical",
+      "category": "stale_independent_oracle",
+      "status": "open",
+      "affected_outputs": [
+        "case_ids",
+        "nobs",
+        "df_model",
+        "df_resid",
+        "parameter_names",
+        "coefficients",
+        "standard_errors",
+        "test_statistics",
+        "p_values",
+        "r_squared",
+        "r_squared_adj",
+        "f_stat",
+        "f_p_value",
+        "ss_residual",
+        "ss_model",
+        "ss_total",
+        "root_mse"
+      ],
+      "formula_ids": [
+        "REG-CASE-001",
+        "REG-SAMPLE-001",
+        "REG-PARAM-001",
+        "REG-DF-001",
+        "REG-OBJ-001",
+        "REG-COEF-001",
+        "REG-RSS-001",
+        "REG-TSS-001",
+        "REG-MSS-001",
+        "REG-VCE-001",
+        "REG-SE-001",
+        "REG-T-001",
+        "REG-TP-001",
+        "REG-R2-001",
+        "REG-AR2-001",
+        "REG-F-001",
+        "REG-FP-001",
+        "REG-RMSE-001",
+        "REG-NOCONSTANT-001"
+      ],
+      "code_locations": [
+        "validation/commands/reg/oracles/code_audit_oracle.py:23-27",
+        "validation/commands/reg/oracles/code_audit_oracle.py:200-213"
+      ],
+      "evidence": [
+        "The oracle expects manifest SHA-256 533e96bde7c0fd15dcc532f127789ab300c21f378c7b344ac99be6a4cafa26d7, but the run freezes 414ed36be847a31db40f46ed00c5fb9793fb0773d04072bc656f8d03e38c56b5.",
+        "The oracle expects cases SHA-256 d6dc76648bcd0433795b60c2f65d46cc89167565384c23e24d864525d42ea7e7, but the run freezes 1b107cfe0d79a0997a04a5a251e4a1eb909404943d7e68f337aae8ea14612c07.",
+        "A direct probe in the captured virtual environment exited 1 with RuntimeError: Frozen input hash mismatch before any metric was derived."
+      ],
+      "consequence": "The frozen independent oracle cannot validate any release-critical formula for this run; end-to-end code/test mapping is incomplete.",
+      "required_action": "Update and re-freeze the independent oracle against the exact current manifest and cases hashes, then execute it for both supported cases."
+    },
+    {
+      "finding_id": "TA-REG-20260726-002",
+      "severity": "critical",
+      "category": "complete_case_test_gap",
+      "status": "open",
+      "affected_outputs": [
+        "nobs",
+        "coefficients",
+        "standard_errors",
+        "test_statistics",
+        "p_values",
+        "fit_statistics"
+      ],
+      "formula_ids": [
+        "REG-SAMPLE-001"
+      ],
+      "authoritative_rule": "Stata [R] regress, printed p. 15: observations with a missing value in one or more model variables are dropped.",
+      "code_locations": [
+        "src/tabra/models/estimate/base.py:19-23",
+        "src/tabra/models/estimate/ols.py:36-43"
+      ],
+      "evidence": [
+        "Both frozen cases use validation/commands/reg/data/reg_fixture.csv, which contains no missing values.",
+        "validation/commands/reg/oracles/code_audit_oracle.py:40-50 converts all cells to float and does not implement complete-case selection.",
+        "tests/test_api.py:50-55 uses a fully observed sample and asserts only n_obs == 100.",
+        "tests/test_ols.py:316-322 covers an all-missing error, not partial joint missingness across y and the requested regressors."
+      ],
+      "consequence": "The release-critical estimation-sample rule is not independently exercised, so all downstream quantities are unverified under missingness.",
+      "required_action": "Add and map an independent partial-missing case or unit test that verifies the common complete-case sample, nobs, parameter ordering, and estimates."
+    },
+    {
+      "finding_id": "TA-REG-20260726-003",
+      "severity": "high",
+      "category": "source_role_mapping",
+      "status": "open",
+      "affected_outputs": [
+        "coefficients",
+        "standard_errors",
+        "test_statistics",
+        "p_values",
+        "f_stat",
+        "f_p_value",
+        "fit_statistics"
+      ],
+      "formula_ids": [
+        "REG-OBJ-001",
+        "REG-COEF-001",
+        "REG-RSS-001",
+        "REG-TSS-001",
+        "REG-MSS-001",
+        "REG-VCE-001",
+        "REG-SE-001",
+        "REG-T-001",
+        "REG-TP-001",
+        "REG-R2-001",
+        "REG-AR2-001",
+        "REG-F-001",
+        "REG-FP-001",
+        "REG-RMSE-001"
+      ],
+      "evidence": [
+        "validation/commands/reg/formula_map.csv:3-20 uses the Stata regress manual as the sole exact reference for every implemented formula.",
+        "validation/commands/reg/theory.md:181-190 labels Aitken (1936) and Fisher (1922) as historical primary context and asserts no exact equation or narrower page location from either."
+      ],
+      "consequence": "Exact original mathematical support is not separately traceable from Stata software-compatibility documentation.",
+      "required_action": "In a newly frozen formula map, add verified exact original-method locations for the claims they support, or identify and justify a distinct authoritative primary mathematical source without inventing historical equation numbers."
+    }
+  ],
+  "decision_reasons": [
+    "The independent formula oracle aborts on stale manifest and cases hashes before deriving any metric.",
+    "The complete-case estimation rule has no independent partially missing test or validation case.",
+    "Exact mathematical-source support is not separated from Stata compatibility documentation in the frozen formula map.",
+    "The accessible official manual, source code, tests, and source metadata are sufficient to diagnose these frozen-artifact deficiencies, so BLOCKED_ENV does not apply."
+  ]
+}

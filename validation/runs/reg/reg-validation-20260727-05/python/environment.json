@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "command": "reg",
+  "run_id": "reg-validation-20260727-05",
+  "engine": "python",
+  "engine_version": "3.11.11",
+  "tabra_commit": "9ce5b597d9e3a2d7b3168262519b2be3019116e9",
+  "manifest_sha256": "bfee2c597697569b212aeb67edbbf34d9e42421272d4430253d6724a45f121b7",
+  "data_sha256": "53f6fea92a7978cbce09212c224eb6e29e9c581ab920e0285ef541c4b09d37c4",
+  "result_sha256": "33488e61673c56eaede753dd3588d6fdb21504a79366a02a4d983e80d937945a",
+  "executable": ".venv/bin/python"
+}
